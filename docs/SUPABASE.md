@@ -26,7 +26,7 @@ Oude self-hosted accounts worden niet als Supabase-accounts geïmpersoneerd. Geb
 
 ## Edge Functions en periodiek werk
 
-`velo-api` verifieert gebruikers server-side via Supabase Auth. Het exacte Strava OAuth-callbackpad en de niet-persoonlijke herstelbeschikbaarheidsflag zijn publiek bereikbaar; de callback het gebruikt een onvoorspelbare, gehashte, vervallende en eenmalige autorisatiesessie. Handoff en PKCE-controle verbinden het resultaat aan het oorspronkelijke account. Accountverwijdering vraagt opnieuw het wachtwoord en verwijdert Auth-account en gekoppelde gegevens via foreign-key cascades.
+`velo-api` verifieert gebruikers server-side via Supabase Auth. Het exacte Strava OAuth-callbackpad en de niet-persoonlijke herstelbeschikbaarheidsflag zijn publiek bereikbaar; de callback gebruikt een onvoorspelbare, gehashte, vervallende en eenmalige autorisatiesessie. Handoff en PKCE-controle verbinden het resultaat aan het oorspronkelijke account. Accountverwijdering vraagt opnieuw het wachtwoord en verwijdert Auth-account en gekoppelde gegevens via foreign-key cascades.
 
 De Strava-adapter ondersteunt activiteitimport, route-import, eigen GPX-upload, afzonderlijke voorkeuren, ontkoppelen, tokenvernieuwing, rate-limits, idempotente taken, retries en geschiedenis. Onzekere uploads vereisen controle voordat opnieuw wordt geüpload. Import is begrensd tot recente activiteiten en kleine routepagina's; er is geen onbegrensde historische import of route-export naar Strava. Provider-tokens zijn extra versleuteld met AES-GCM en aan de eigenaar gebonden. Refresh herstelt geen intussen verwijderde verbinding. Deze adapter is voorbereid, maar zonder echte providercredentials niet live gekoppeld.
 
@@ -58,7 +58,7 @@ Maak databasebackups via de beschikbare Supabase-backupvoorziening of een beveil
 
 ## Controles
 
-`scripts/test_supabase_live.py --token-file <privaat-tokenbestand>` maakt twee tijdelijke accounts aan en ruimt ze altijd op. Het controleert echte registratie, login, incorrect wachtwoord, database, anonieme toegang, cross-account RLS, spoofed eigenaar, private RPC-toegang, conflicten, tombstones, Edge-authenticatie, ontbrekende providerconfiguratie, sessievernieuwing, intrekking en accountverwijdering. De eerste volledige run: **35 controles geslaagd**.
+`scripts/test_supabase_live.py --token-file <privaat-tokenbestand>` maakt twee tijdelijke accounts aan en ruimt ze altijd op. Het controleert echte registratie, login, incorrect wachtwoord, database, anonieme toegang, cross-account RLS, spoofed eigenaar, private RPC-toegang, conflicten, tombstones, Edge-authenticatie, ontbrekende providerconfiguratie, sessievernieuwing, intrekking en accountverwijdering. Laatste volledige run: **35 controles geslaagd**.
 
 Daarnaast testen Fluttertests de SDK-adapter, secure storage en bestaande lokale functies. `integration_test/account_flow_test.dart` test echte registratie, sessieherstel, uitloggen, login en synchronisatie op Android. Deno controleert types en test Edge-authenticatie, schedulerafscherming, eigenaargebonden encryptie en GPX. GitHub-CI gebruikt geen productiecredentials.
 

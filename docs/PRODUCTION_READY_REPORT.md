@@ -53,4 +53,13 @@ Artefacten: `dist/velo-debug.apk` en `dist/velo-supabase.apk` (ondertekende rele
 
 De gewijzigde onderdelen staan in `lib/app/`, `lib/features/`, `lib/services/accounts/`, `lib/services/integrations/`, `lib/services/gps/`, `android/`, `supabase/`, `scripts/`, `config/`, `test/`, `integration_test/`, `.github/workflows/` en deze documentatie. De oude self-hosted broncode blijft historisch bewaard; de oude stacks zijn niet bediend of verwijderd.
 
-Zie [Supabase-beheer](SUPABASE.md) en de Git-commit voor de volledige bestandsdiff. De exacte release en hashes worden bij publicatie vastgelegd.
+Zie [Supabase-beheer](SUPABASE.md) en de Git-commit voor de volledige bestandsdiff. Broncommit: `60ead98329fabe911eb9557446be483fafeef7f3` (73 gewijzigde bestanden). De volledige diff staat op https://github.com/AnecaW/VELO/commit/60ead98329fabe911eb9557446be483fafeef7f3.
+
+Release: https://github.com/AnecaW/VELO/releases/tag/android-supabase-v2.3.0. Beide APK's en `SHA256SUMS.txt` zijn gepubliceerd. De definitieve debug-update is opnieuw op de fysieke telefoon geïnstalleerd; pakketversie 2.3.0, build 5 is op het toestel gecontroleerd. Het releasemanifest weigert cleartext HTTP en bevat geen Android HOME-intent.
+
+SHA-256:
+
+- `velo-supabase.apk`: `48181f6ceb33070c8595b819d4af40dc3e1125ad29da626e53f4fa59d9c29887`
+- `velo-debug.apk`: `3a01f90618679cd451d85ce6cb69ddedb3abc6fa2e5a58998a43078b7088380f`
+
+Getrackte bestanden, volledige Git-geschiedenis en beide APK's zijn gecontroleerd tegen de lokaal bewaarde private secrets. De broncommit is gepusht en de GitHub-controles voor Flutter, Supabase en de behouden backendtests zijn geslaagd. Cloudcontrole na deployment: beide functies ACTIVE, RLS 9/9, cron actief met HTTP 200 en nul resterende testaccounts.
