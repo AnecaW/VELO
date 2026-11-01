@@ -29,6 +29,10 @@ De aanbevolen stack gebruikt een gepubliceerde image en heeft geen relatieve hos
 
 `compose.yaml` is daarnaast geschikt voor lokale Compose-builds of een Portainer-installatie met ondersteuning voor Git-buildcontexten. `compose.portainer.yaml` werkt met de gepubliceerde image en heeft die extra ondersteuning niet nodig. Dit is een Docker Standalone Compose-stack, geen Swarm-stack.
 
+## Beperkte Portainer-identiteit
+
+De werkelijk gedeployde stack gebruikt `deployment/compose.portainer-restricted.yaml`, stacknaam `velo`, environment 4 op de Agent. Deze variant is nodig wanneer Portainer capability-overrides voor gewone gebruikers verbiedt. Ook het laten vallen van capabilities wordt door die Portainer-regel geweigerd. De image draait als UID 10001 en behoudt `no-new-privileges` en een alleen-lezen rootbestandssysteem. Op de server zijn nul effectieve en toegestane capabilities geverifieerd. Gebruik `compose.portainer.yaml` als de beheerpolicy capability-overrides wel toestaat.
+
 ## HTTPS en netwerk
 
 Kies een eigen domein, bijvoorbeeld `velo.jouwdomein.be`. Stel `VELO_PUBLIC_URL=https://velo.jouwdomein.be` in. Gebruik Caddy/Nginx met een geldig publiek certificaat en DNS A/AAAA-records naar je reverse proxy; publiceer alleen 443 (en 80 voor certificaatuitgifte indien nodig). Proxy naar de interne Agent-poort. Een alternatief is een Cloudflare Tunnel met public hostname naar `http://<agent-adres>:8080`, zonder router port-forward. Laat een eventuele browser-only toegangscontrole de mobiele API en OAuth-callback niet blokkeren; VELO-authenticatie beschermt de accountendpoints.

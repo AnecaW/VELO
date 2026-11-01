@@ -25,23 +25,33 @@ Uitgevoerd op 1 november 2026. De bestaande Flutter-app staat behouden in de pro
 - De eerste Flutter-CI-run vond de lege iconenmap die Git niet had meegenomen. De map wordt inmiddels met een README bewaard; de nieuwe CI-run is via GitHub Actions te volgen.
 - Voor commit/push zijn de index en geheimenpatronen gecontroleerd. De enige gevonden lange wachtwoord/secret-literals waren expliciete backendtestwaarden. Productie-env, databases, GPS-bestanden, back-ups, APK's, signingkeys en lokale logs zijn uitgesloten. De remote had bij aanvang geen commits om op oudere secrets te controleren.
 
-## Nog niet op de homelabserver geïnstalleerd
+## Werkelijk gedeployed op de homelabserver
 
-Dit is geen claim van productie-deployment. Portainer is bereikbaar op HTTPS-poort 9443 en rapporteerde versie 2.39.5. De beheerserver gebruikt een zelfondertekend certificaat; er zijn geen serverwachtwoorden of API-credentials naartoe verstuurd. Alleen publieke statusmetadata werd zonder credentials gelezen.
+Op 1 november 2026 is via de afzonderlijke Portainer API-key en het door de gebruiker bevestigde, vastgepinde TLS-certificaat de Git-stack `velo` aangemaakt. Stack-ID: **25**; environment-ID: **4**, naam `brunoserverdesktop`, Agent `192.168.0.150:9001`. Er zijn geen gewone server- of rootwachtwoorden gebruikt.
 
-Voor automatische deployment ontbreken nog een afzonderlijke Portainer API-key en controle van het beheercertificaat. De gebruiker is gevraagd de key buiten de repository op te slaan in `C:\Users\wanne\.codex\secrets\velo-portainer-api-key.txt` en de waargenomen SHA-256-fingerprint `6af0a3650c7540e8e1807abdc3db1906b631e2d9b36993a1be2c4e99636e1269` te bevestigen. Zonder die controle wordt de key niet naar een ongeverifieerde HTTPS-server gestuurd.
+De stack gebruikt `deployment/compose.portainer-restricted.yaml` uit dezelfde GitHub-repository en de hierboven vermelde gepubliceerde image-digest. Portainer blokkeert capability-overrides voor deze beperkte identiteit, zelfs `cap_drop: ALL`. De variant behoudt de niet-root imagegebruiker, het alleen-lezen rootbestandssysteem en `no-new-privileges`. Runtime gecontroleerd: UID 10001, `CapPrm=0`, `CapEff=0`, `NoNewPrivs=1`.
+
+- `velo-api-1`, `velo-worker-1` en `velo-backup-1`: running en healthy.
+- LAN-backend: `http://192.168.0.150:8080`.
+- Healthcheck: `http://192.168.0.150:8080/healthz`, HTTP 200, `status: ok`, versie 3.0.0.
+- Named volumes: `velo_data` en `velo_backups`, op de Agent-host.
+- Herstartbeleid: `unless-stopped` voor alle drie containers.
+- Eerste beheerder via het CLI-installatieproces aangemaakt met het door de gebruiker opgegeven e-mailadres en een willekeurig gegenereerd wachtwoord. Dat wachtwoord is uitsluitend opgeslagen in `C:\Users\wanne\.codex\secrets\velo-admin-initial.txt`; de productie-encryptiesleutel en variabelen staan uitsluitend buiten Git in `C:\Users\wanne\.codex\secrets\velo-production.env`. Beide bestanden hebben toegangsrechten voor de huidige Windows-gebruiker.
+- Echte LAN-verzoeken getest voor registratie, login, fout wachtwoord, gegevensisolatie, refresh-rotatie, uitloggen, intrekking en ontbrekende SMTP/Strava-configuratie. De twee wegwerpaccounts en hun testgegevens zijn nadien verwijderd.
+- Alle drie containers herstart. Daarna beheerderlogin, schema 3 en persistentie gecontroleerd. Alleen het beheerdersaccount bleef aanwezig.
+- Een versleutelde back-up na installatie is daadwerkelijk aangemaakt: `/backups/velo-after-install.velobackup`, 224382 bytes. Dagelijkse back-ups staan daarnaast aan.
+
+Er is nog geen publieke HTTPS-origin ingericht. `VELO_PUBLIC_URL=https://velo.example.test` is voorlopig uitsluitend een configuratieplaceholder, geen werkende publieke URL. LAN-toegang via HTTP is bedoeld voor de debug-app. Releasegebruik en Strava-callbacks vereisen een geldig HTTPS-domein.
 
 Voor Strava ontbreken Client ID, Client Secret en een werkend geregistreerd HTTPS-callbackdomein. De protocollen zijn getest met providerfixtures; er is geen echte Strava-accountkoppeling of live synchronisatie geclaimd. Strava meldt zonder configuratie correct dat koppeling niet beschikbaar is.
 
 SMTP en e-mailverificatie blijven op expliciet verzoek ongeconfigureerd. Wachtwoordherstel toont dan een duidelijke melding. Later volstaan de SMTP-omgevingsvariabelen en een herdeployment; een databaseherinstallatie is niet nodig.
 
-## Handmatige vervolgstappen
+## Vervolgstappen voor de gebruiker
 
-1. Selecteer in Portainer de environment van Docker Agent `192.168.0.150`.
-2. Maak een Git-stack uit `https://github.com/AnecaW/VELO`, branch `main`, composepad `deployment/compose.portainer.yaml`.
-3. Vul `VELO_IMAGE` met bovenstaande digest, genereer en bewaar `VELO_ENCRYPTION_KEYS`, en stel `VELO_PUBLIC_URL`, bindadres en poort in volgens `SELF_HOSTING.md`. Strava en SMTP mogen leeg blijven.
-4. Start de stack en controleer de drie healthchecks. Voer in de API-containerconsole interactief `python -m velo_backend.cli create-admin` uit.
-5. Test de LAN-healthcheck en stel het serveradres in via Meer > VELO-account. Gebruik een debugbuild voor HTTP-LAN-tests en een geldig HTTPS-domein voor releasegebruik.
-6. Configureer later de Strava-app en het callbackdomein; test verbinden, synchroniseren en ontkoppelen met je eigen account.
+1. Lees het tijdelijke beheerderswachtwoord uit het bovengenoemde lokale bestand. Stel in de debug-app via Meer > VELO-account het serveradres `http://192.168.0.150:8080` in en log in met het opgegeven e-mailadres. Wijzig het tijdelijke wachtwoord via de accountpagina.
+2. Bewaar de productie-encryptiesleutel en back-ups ook op een tweede beveiligde locatie. Zonder de sleutel zijn de versleutelde gegevens en back-ups niet herstelbaar.
+3. Configureer een geldig HTTPS-domein met reverse proxy of tunnel, wijzig `VELO_PUBLIC_URL` in Portainer en herdeploy. Gebruik die HTTPS-URL in de release-app.
+4. Configureer desgewenst Strava Client ID, Client Secret en het geregistreerde callbackdomein. SMTP blijft uitgeschakeld tot je de SMTP-variabelen invult.
 
-De volledige commando's voor updates en herstel staan in `SELF_HOSTING.md`. Er staat geen productie-backend-URL vast zolang de stack en HTTPS-origin niet zijn ingericht.
+De volledige commando's voor updates en herstel staan in `SELF_HOSTING.md`. GitHub Flutter-CI gebruikt nu JDK 21 omdat de bestaande MapLibre-plugin Java source level 21 vereist. De lokale Android-builds gebruikten al een geschikte JDK.
