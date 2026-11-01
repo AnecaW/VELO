@@ -1,9 +1,15 @@
 name: Backend image
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['backend/**', 'deployment/**', '.github/workflows/backend-image.yaml']
 permissions:
-  contents: read
+  contents: write
   packages: write
+concurrency:
+  group: backend-release
+  cancel-in-progress: false
 jobs:
   image:
     runs-on: ubuntu-latest
@@ -22,3 +28,11 @@ jobs:
           docker build -t "$IMAGE:$GITHUB_SHA" -t "$IMAGE:latest" backend
           docker push "$IMAGE:$GITHUB_SHA"
           docker push "$IMAGE:latest"
+          DIGEST=$(docker image inspect "$IMAGE:$GITHUB_SHA" --format '{{index .RepoDigests 0}}')
+          export DIGEST
+          python -c 'import os,json; open("velo-backend-release.json","w").write(json.dumps({"image":os.environ["DIGEST"],"source_commit":os.environ["GITHUB_SHA"]}))'
+          if gh release view "backend-$GITHUB_SHA" >/dev/null 2>&1; then
+            echo "Immutable release already exists."
+          else
+            gh release create "backend-$GITHUB_SHA" velo-backend-release.json --target "$GITHUB_SHA" --title "VELO backend ${GITHUB_SHA:0:7}" --notes "Tested immutable backend image; the homelab updater verifies health and makes a backup before deployment."
+          fi

@@ -12,6 +12,13 @@ import 'integration_models.dart';
 class BackendStravaService extends StravaService {
   final AccountService accounts;
   BackendStravaService(super.database, this.accounts);
+  Future<Map<String, dynamic>> information() async {
+    if (accounts.user == null) return {'configured': false, 'connected': false};
+    return Map<String, dynamic>.from(
+      await accounts.request('GET', '/api/v1/integrations/strava'),
+    );
+  }
+
   Future<void> refreshStatus() async {
     if (accounts.user == null) return;
     final info = await accounts.request('GET', '/api/v1/integrations/strava');
@@ -37,6 +44,7 @@ class BackendStravaService extends StravaService {
         'sync',
         job['job_key'],
         jsonEncode({
+          'job_id': job['id'],
           'status': job['status'],
           'attempts': job['attempts'],
           'error': job['error'],
@@ -90,6 +98,13 @@ class BackendStravaService extends StravaService {
     String clientId, {
     List<String> scopes = const ['activity:read'],
   }) async {
+    if (await database.getDocument('integration-preferences', 'strava') ==
+        null) {
+      await SyncRepository(database).savePreferences(
+        'strava',
+        const SyncPreferences(automatic: true, afterRide: true),
+      );
+    }
     final state = base64UrlEncode(
       List.generate(32, (_) => Random.secure().nextInt(256)),
     ).replaceAll('=', '');
@@ -152,6 +167,21 @@ class BackendStravaService extends StravaService {
         'state': state,
         'handoff': uri.queryParameters['handoff'],
         'code_verifier': verifier,
+      },
+    );
+    final preferences = await SyncRepository(database).preferences('strava');
+    await accounts.request(
+      'PUT',
+      '/api/v1/integrations/strava/preferences',
+      body: {
+        for (final key in [
+          'enabled',
+          'automatic',
+          'activities',
+          'routes',
+          'uploads',
+        ])
+          key: preferences.toJson()[key],
       },
     );
     await cancelAuthorization();
@@ -217,6 +247,9 @@ class BackendStravaIntegration extends StravaIntegration {
     SyncPreferences preferences, {
     bool reset = false,
   }) async {
+    if (reset) {
+      await accounts.request('DELETE', '/api/v1/integrations/strava/cache');
+    }
     await accounts.request(
       'PUT',
       '/api/v1/integrations/strava/preferences',

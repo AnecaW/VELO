@@ -58,14 +58,19 @@ class RideHistoryService {
   }
 
   /// Save a ride
-  Future<String> saveRide(RideSession ride) async {
+  Future<String> saveRide(
+    RideSession ride, {
+    bool replace = false,
+    bool clearActive = true,
+  }) async {
     final id =
         ride.id ??
         'ride-${ride.startTime?.microsecondsSinceEpoch ?? DateTime.now().microsecondsSinceEpoch}';
-    if (await database.getDocument('ride', id) != null) return id;
+    if (!replace && await database.getDocument('ride', id) != null) return id;
     final savedRide = ride.copyWith(id: id, state: RideState.saved);
 
     await database.transaction(() async {
+      if (replace) await database.deleteRideByRideId(id);
       await database.insertRide(
         RideHistoryTableCompanion(
           rideId: Value(id),
@@ -89,7 +94,7 @@ class RideHistoryService {
       );
 
       await database.putDocument('ride', id, SessionCodec.encode(savedRide));
-      await database.removeDocument('active', 'ride');
+      if (clearActive) await database.removeDocument('active', 'ride');
     });
     await loadPersistedRides();
     return id;
@@ -140,6 +145,7 @@ class RideHistoryService {
       );
     });
     _rides.clear();
+    database.documentsChanged('ride');
   }
 
   RideSession _fromRow(RideHistoryTableData row) {

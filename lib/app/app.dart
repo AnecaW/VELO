@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:bike_computer/core/runtime.dart';
 import 'package:bike_computer/app/router.dart';
 import 'package:bike_computer/app/theme.dart';
+import 'package:bike_computer/features/accounts/account_gate.dart';
 
 class BikeComputerApp extends StatelessWidget {
-  const BikeComputerApp({super.key});
+  final bool showAccountWelcome;
+  const BikeComputerApp({super.key, this.showAccountWelcome = false});
 
   @override
   Widget build(BuildContext context) {
@@ -31,6 +33,9 @@ class BikeComputerApp extends StatelessWidget {
           _ => ThemeMode.dark,
         },
         routerConfig: router,
+        builder: (context, child) => showAccountWelcome
+            ? AccountGate(account: Runtime.accounts, child: child!)
+            : child!,
       ),
     );
   }

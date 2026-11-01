@@ -1,0 +1,4 @@
+{
+  "VELO_BACKEND_URL": "https://velo.example.com",
+  "VELO_LAN_MODE": "false"
+}

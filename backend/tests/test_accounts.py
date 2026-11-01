@@ -48,7 +48,7 @@ def test_refresh_expiry_and_migrations(setup):
     with db.connect(True) as con:con.execute('UPDATE refresh_tokens SET expires_at=0')
     assert client.post('/api/v1/accounts/refresh',json={'refresh_token':tokens['refresh_token']}).status_code==401
     db.migrate()
-    with db.connect() as con:assert con.execute('SELECT MAX(version) FROM schema_migrations').fetchone()[0]==3
+    with db.connect() as con:assert con.execute('SELECT MAX(version) FROM schema_migrations').fetchone()[0]==4
 
 
 def test_configured_reset_is_generic_single_use_and_revokes_sessions(setup,monkeypatch):

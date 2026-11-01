@@ -26,6 +26,7 @@ class Settings:
     smtp_username: str = ""
     smtp_password: str = ""
     smtp_from: str = ""
+    ors_api_key: str = ""
 
     @property
     def smtp_ready(self):
@@ -40,6 +41,7 @@ class Settings:
         result.smtp_username = os.getenv('SMTP_USERNAME', '')
         result.smtp_password = secret('SMTP_PASSWORD')
         result.smtp_from = os.getenv('SMTP_FROM', '')
+        result.ors_api_key = secret('ORS_API_KEY')
         result.validate()
         return result
 

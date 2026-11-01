@@ -1,0 +1,31 @@
+# Separate maintenance stack: remains running while the application is updated.
+services:
+  updater:
+    image: ${VELO_UPDATER_IMAGE:?Set the tested immutable updater image}
+    command: [python, -m, velo_backend.cli, updater]
+    restart: unless-stopped
+    init: true
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    tmpfs: ['/tmp:size=16m,mode=1777']
+    environment:
+      PORTAINER_URL: ${PORTAINER_URL:?Set the management HTTPS origin}
+      PORTAINER_CERT_SHA256: ${PORTAINER_CERT_SHA256:?Set the confirmed certificate fingerprint}
+      PORTAINER_API_KEY: ${PORTAINER_API_KEY:?Use a limited stack deployment identity}
+      VELO_DEPLOY_ENVIRONMENT_ID: ${VELO_DEPLOY_ENVIRONMENT_ID:?Select the Agent environment}
+      VELO_DEPLOY_AGENT_URL: ${VELO_DEPLOY_AGENT_URL:?Set the expected Agent URL}
+      VELO_DEPLOY_STACK_ID: ${VELO_DEPLOY_STACK_ID:?Set the existing application stack ID}
+      VELO_DEPLOY_STACK_NAME: ${VELO_DEPLOY_STACK_NAME:-velo}
+      VELO_UPDATE_REPOSITORY: ${VELO_UPDATE_REPOSITORY:-AnecaW/VELO}
+      VELO_UPDATE_INTERVAL: ${VELO_UPDATE_INTERVAL:-600}
+    volumes: [updater_state:/data]
+    healthcheck:
+      test: [CMD, python, -c, "import os,time; assert time.time()-os.path.getmtime('/tmp/updater-heartbeat')<21600"]
+      interval: 60s
+      timeout: 5s
+      start_period: 5m
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: '3'}
+volumes:
+  updater_state:

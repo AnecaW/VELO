@@ -12,7 +12,8 @@ Future<void> main() async {
   } catch (e) {
     Runtime.lastError = 'Instellingen: $e';
   }
-  runApp(const BikeComputerApp());
+  runApp(const BikeComputerApp(showAccountWelcome: true));
+  Runtime.accountSync.initialize();
   unawaited(Runtime.accounts.restore().catchError((Object _) {}));
   unawaited(
     Runtime.integrations.initialize().catchError((Object e) {

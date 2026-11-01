@@ -48,7 +48,7 @@ class _GpxExchangeScreenState extends State<GpxExchangeScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('GPX · zonder accountserver')),
+    appBar: AppBar(title: const Text('GPX-bestanden')),
     body: ListView(
       padding: const EdgeInsets.all(20),
       children: [
@@ -58,7 +58,7 @@ class _GpxExchangeScreenState extends State<GpxExchangeScreen> {
         ),
         const SizedBox(height: 12),
         const Text(
-          'Geen server, tokens of automatische accountkoppeling. Exporteer een eigen rit als GPX en upload die zelf via de officiële website van de dienst. Importeer GPX-routes die je daar zelf hebt geëxporteerd. Alleen jij kiest en verstuurt bestanden.',
+          'Exporteer je eigen ritten en importeer routes als GPX. Je kiest zelf welke bestanden je deelt.',
         ),
         const SizedBox(height: 16),
         FilledButton.icon(

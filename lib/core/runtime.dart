@@ -1,5 +1,6 @@
 import 'package:bike_computer/services/integrations/strava_integration.dart';
 import 'package:bike_computer/services/accounts/account_service.dart';
+import 'package:bike_computer/services/accounts/account_sync.dart';
 import 'package:bike_computer/services/integrations/backend_strava.dart';
 import 'package:bike_computer/services/training/training_generator.dart';
 import 'package:bike_computer/services/training/workout_runner.dart';
@@ -11,8 +12,13 @@ import 'package:bike_computer/services/bluetooth/ble_sensor_manager.dart';
 
 class Runtime {
   static final AccountService accounts = AccountService(
-    onIdentityChange: () async {
+    refreshMutex: (action) => database.withAccountRefreshLock(action),
+    onIdentityChange: (next) async {
+      if (await database.getDocument('account-owner', 'current') == next) {
+        return;
+      }
       await StravaCache(database).expire(all: true);
+      await accountSync.switchIdentity(next);
       for (final kind in [
         'sync',
         'sync-history',
@@ -36,6 +42,12 @@ class Runtime {
   );
   static var database = BikeComputerDatabase();
   static var settings = AppSettings(database);
+  static AccountSync? _accountSync;
+  static AccountSync get accountSync => _accountSync ??= AccountSync(
+    database,
+    accounts,
+    onSettingsChanged: () => settings.load(),
+  );
   static final sensors = BleSensorManager();
   static WorkoutRunner? _runner;
   static WorkoutRunner get workout =>
@@ -48,8 +60,11 @@ class Runtime {
   static IntegrationCoordinator get integrations =>
       _integrations ??= IntegrationCoordinator(
         BackendStravaIntegration(BackendStravaService(database, accounts)),
+        syncAccount: () => accountSync.run(),
       );
   static void configure(BikeComputerDatabase db) {
+    _accountSync?.dispose();
+    _accountSync = null;
     _integrations?.dispose();
     _integrations = null;
     _ride?.dispose();

@@ -3,14 +3,18 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:bike_computer/services/navigation/gpx_route.dart';
 
+import '../accounts/account_service.dart';
+
 class RoutingClient {
   final http.Client client;
-  RoutingClient({http.Client? client}) : client = client ?? http.Client();
+  final AccountService? accounts;
+  RoutingClient({http.Client? client, this.accounts})
+    : client = client ?? http.Client();
   Future<List<({String label, NavPoint point})>> search(
     String query,
     String key,
   ) async {
-    if (key.isEmpty) {
+    if (accounts == null && key.isEmpty) {
       throw StateError('Geocoding vereist je openrouteservice API-sleutel');
     }
     if (query.trim().length < 3) {
@@ -20,13 +24,22 @@ class RoutingClient {
       'text': query.trim(),
       'size': '5',
     });
-    final response = await client
-        .get(uri, headers: {'Authorization': key})
-        .timeout(const Duration(seconds: 20));
-    if (response.statusCode != 200) {
-      throw StateError('Adres zoeken mislukt (HTTP ${response.statusCode})');
+    final dynamic data;
+    if (accounts != null) {
+      data = await accounts!.request(
+        'GET',
+        '/api/v1/navigation/search?q=${Uri.encodeQueryComponent(query.trim())}',
+      );
+    } else {
+      final response = await client
+          .get(uri, headers: {'Authorization': key})
+          .timeout(const Duration(seconds: 20));
+      if (response.statusCode != 200) {
+        throw StateError('Adres zoeken mislukt (HTTP ${response.statusCode})');
+      }
+      data = jsonDecode(response.body);
     }
-    final features = jsonDecode(response.body)['features'] as List;
+    final features = data['features'] as List;
     return features.map((f) {
       final c = f['geometry']['coordinates'];
       return (
@@ -42,7 +55,7 @@ class RoutingClient {
     String key, {
     String profile = 'cycling-regular',
   }) async {
-    if (key.trim().isEmpty) {
+    if (accounts == null && key.trim().isEmpty) {
       throw StateError(
         'Stel eerst je openrouteservice API-sleutel in bij Integrations.',
       );
@@ -55,28 +68,44 @@ class RoutingClient {
     ].contains(profile)) {
       throw ArgumentError('Profiel niet ondersteund');
     }
-    final response = await client
-        .post(
-          Uri.parse(
-            'https://api.openrouteservice.org/v2/directions/$profile/geojson',
-          ),
-          headers: {'Authorization': key, 'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'coordinates': [
-              [start.lon, start.lat],
-              [end.lon, end.lat],
-            ],
-            'elevation': true,
-            'instructions': true,
-          }),
-        )
-        .timeout(const Duration(seconds: 25));
-    if (response.statusCode != 200) {
-      throw StateError(
-        'Routering mislukt (HTTP ${response.statusCode}); bestaande route blijft beschikbaar.',
+    final dynamic data;
+    if (accounts != null) {
+      data = await accounts!.request(
+        'POST',
+        '/api/v1/navigation/directions',
+        body: {
+          'coordinates': [
+            [start.lon, start.lat],
+            [end.lon, end.lat],
+          ],
+          'profile': profile,
+        },
       );
+    } else {
+      final response = await client
+          .post(
+            Uri.parse(
+              'https://api.openrouteservice.org/v2/directions/$profile/geojson',
+            ),
+            headers: {'Authorization': key, 'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'coordinates': [
+                [start.lon, start.lat],
+                [end.lon, end.lat],
+              ],
+              'elevation': true,
+              'instructions': true,
+            }),
+          )
+          .timeout(const Duration(seconds: 25));
+      if (response.statusCode != 200) {
+        throw StateError(
+          'Routering mislukt (HTTP ${response.statusCode}); bestaande route blijft beschikbaar.',
+        );
+      }
+      data = jsonDecode(response.body);
     }
-    final feature = jsonDecode(response.body)['features'][0];
+    final feature = data['features'][0];
     final coords = feature['geometry']['coordinates'] as List;
     if (coords.length < 2) {
       throw const FormatException('Provider leverde geen route');

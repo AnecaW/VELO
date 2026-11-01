@@ -20,6 +20,7 @@ from .config import Settings
 from .storage import Database
 from .security import digest,password_hash,password_valid,session
 from .accounts import install_accounts
+from .navigation import install_navigation
 from .strava import Strava,ProviderError
 from .jobs import enqueue,gpx
 
@@ -48,15 +49,17 @@ class Document(Model):
     payload:dict
     expected_revision:int|None=Field(default=None,ge=0)
 class Password(Model):password:str=Field(max_length=256)
+class RetryJob(Model): confirmed_no_duplicate:bool=False
 
-KINDS={'settings','rides','routes','training_plans'}
+KINDS={'settings','rides','routes','training_plans','profiles','training_profile','training_results'}
 SCOPES={'activity:read','activity:read_all','activity:write','read','read_all'}
 
 def validate_document(kind,id,payload):
-    if kind not in KINDS or not re.fullmatch(r'[A-Za-z0-9_.: -]{1,200}',id) or id.startswith('strava:') or payload.get('source')=='Strava':raise Problem(422,'Ongeldige lokale gegevens of externe API-cache.','invalid_document')
+    if kind not in KINDS or not re.fullmatch(r'[\w.: ~-]{1,200}',id) or id.startswith('strava:') or payload.get('source')=='Strava':raise Problem(422,'Ongeldige lokale gegevens of externe API-cache.','invalid_document')
     try:
         if len(json.dumps(payload,allow_nan=False).encode())>10*1024*1024:raise ValueError()
         if kind=='rides':
+            if payload.get('id')!=id:raise ValueError()
             if payload.get('v')!=1 or not isinstance(payload.get('points'),list):raise ValueError()
             for key in ('distance','elapsed','moving','paused','gain','loss'):
                 if key in payload and (isinstance(payload[key],bool) or not isinstance(payload[key],(int,float)) or not math.isfinite(payload[key]) or payload[key]<0):raise ValueError()
@@ -75,7 +78,7 @@ def validate_document(kind,id,payload):
 def create_app(settings=None,provider=None):
     settings=settings or Settings.environment();settings.validate();db=Database(settings)
     strava=provider or Strava(db)
-    app=FastAPI(title='VELO Self-Hosted API',version='3.0.0',docs_url=None,redoc_url=None,openapi_url=None)
+    app=FastAPI(title='VELO Self-Hosted API',version='3.1.0',docs_url=None,redoc_url=None,openapi_url=None)
     app.state.db,app.state.strava=db,strava
     dummy=password_hash(secrets.token_urlsafe(32))
 
@@ -123,12 +126,12 @@ def create_app(settings=None,provider=None):
     @app.get('/healthz')
     def health():
         with db.connect() as con:con.execute('SELECT 1').fetchone()
-        return {'status':'ok','version':'3.0.0'}
+        return {'status':'ok','version':'3.1.0'}
 
     @app.get('/api/v1/server')
     def server():
         with db.connect() as con:first=not bool(con.execute("SELECT 1 FROM server_state WHERE key='bootstrap_consumed'").fetchone())
-        return {'name':'VELO','version':'3.0.0','registration_requires':'bootstrap' if first else 'invitation','strava_configured':settings.strava_ready,'strava_client_id':settings.strava_client_id,'callback_url':settings.public_url+'/oauth/strava/callback'}
+        return {'name':'VELO','version':'3.1.0','registration_requires':'bootstrap' if first else 'invitation','strava_configured':settings.strava_ready,'strava_client_id':settings.strava_client_id,'callback_url':settings.public_url+'/oauth/strava/callback'}
 
     @app.post('/api/v1/auth/register',status_code=201)
     def register(body:Register):
@@ -318,9 +321,23 @@ def create_app(settings=None,provider=None):
         with db.connect() as con:rows=con.execute('SELECT provider,status,message,created_at FROM sync_history WHERE user_id=? ORDER BY created_at DESC LIMIT 100',(current['id'],)).fetchall()
         return [dict(r) for r in rows]
 
+    @app.post('/api/v1/jobs/{id}/retry')
+    def retry_job(id:str,body:RetryJob,current=Depends(user)):
+        with db.connect(True) as con:
+            row=con.execute('SELECT * FROM jobs WHERE id=? AND user_id=?',(id,current['id'])).fetchone()
+            if not row:raise Problem(404,'Taak niet gevonden.','not_found')
+            if row['status'] not in ('failed','needs_review'):raise Problem(409,'Deze taak kan niet opnieuw worden gestart.','invalid_job_state')
+            if row['status']=='needs_review' and not body.confirmed_no_duplicate:raise Problem(409,'Controleer eerst bij Strava of deze rit al bestaat.','confirmation_required')
+            con.execute("UPDATE jobs SET status='pending',next_at=?,lease_until=0,error=NULL,updated_at=? WHERE id=?",(int(time.time()),int(time.time()),id))
+        return {'queued':True}
+
     @app.get('/api/v1/data/{kind}')
-    def list_data(kind:str,after:int=0,current=Depends(user)):
+    def list_data(kind:str,after:int=0,include_deleted:bool=False,current=Depends(user)):
         if kind not in KINDS:raise Problem(404,'Gegevenstype niet gevonden.','not_found')
+        if include_deleted:
+            with db.connect() as con:
+                rows=con.execute('SELECT id,payload,revision,updated_at,0 AS deleted FROM documents WHERE user_id=? AND kind=? AND revision>? UNION ALL SELECT id,NULL AS payload,revision,deleted_at AS updated_at,1 AS deleted FROM document_tombstones WHERE user_id=? AND kind=? AND revision>? ORDER BY revision LIMIT 100',(current['id'],kind,after,current['id'],kind,after)).fetchall()
+            return {'items':[{'id':r['id'],'payload':None if r['deleted'] else db.open(r['payload']),'revision':r['revision'],'updated_at':r['updated_at'],'deleted':bool(r['deleted'])} for r in rows],'cursor':rows[-1]['revision'] if rows else after,'has_more':len(rows)==100}
         with db.connect() as con:rows=con.execute('SELECT * FROM documents WHERE user_id=? AND kind=? AND revision>? ORDER BY revision LIMIT 100',(current['id'],kind,after)).fetchall()
         return {'items':[{'id':r['id'],'payload':db.open(r['payload']),'revision':r['revision'],'updated_at':r['updated_at']} for r in rows],'cursor':rows[-1]['revision'] if rows else after,'has_more':len(rows)==100}
 
@@ -329,17 +346,29 @@ def create_app(settings=None,provider=None):
         validate_document(kind,id,body.payload)
         with db.connect(True) as con:
             old=con.execute('SELECT * FROM documents WHERE user_id=? AND kind=? AND id=?',(current['id'],kind,id)).fetchone()
+            deleted=con.execute('SELECT revision FROM document_tombstones WHERE user_id=? AND kind=? AND id=?',(current['id'],kind,id)).fetchone()
+            if deleted and body.expected_revision!=deleted['revision']:raise Problem(409,'Deze gegevens zijn op een ander toestel verwijderd.','revision_conflict')
             if old and db.open(old['payload'])==body.payload:return {'id':id,'revision':old['revision'],'unchanged':True}
             if old and body.expected_revision!=old['revision']:raise Problem(409,'Servergegevens zijn gewijzigd. Los het conflict op voordat je overschrijft.','revision_conflict')
             counter=con.execute("SELECT value FROM server_state WHERE key='document_revision'").fetchone();revision=int(counter['value'])+1 if counter else 1
             con.execute("INSERT INTO server_state VALUES('document_revision',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(str(revision),))
             con.execute('INSERT INTO documents VALUES(?,?,?,?,?,?) ON CONFLICT(user_id,kind,id) DO UPDATE SET payload=excluded.payload,revision=excluded.revision,updated_at=excluded.updated_at',(current['id'],kind,id,db.seal(body.payload),revision,int(time.time())))
+            con.execute('DELETE FROM document_tombstones WHERE user_id=? AND kind=? AND id=?',(current['id'],kind,id))
         return {'id':id,'revision':revision,'unchanged':False}
 
     @app.delete('/api/v1/data/{kind}/{id}')
-    def delete_data(kind:str,id:str,current=Depends(user)):
+    def delete_data(kind:str,id:str,expected_revision:int|None=None,current=Depends(user)):
         if kind not in KINDS:raise Problem(404,'Gegevenstype niet gevonden.','not_found')
-        with db.connect(True) as con:con.execute('DELETE FROM documents WHERE user_id=? AND kind=? AND id=?',(current['id'],kind,id))
-        return {'deleted':True,'local_device_data_unchanged':True}
+        with db.connect(True) as con:
+            old=con.execute('SELECT revision FROM documents WHERE user_id=? AND kind=? AND id=?',(current['id'],kind,id)).fetchone()
+            tombstone=con.execute('SELECT revision FROM document_tombstones WHERE user_id=? AND kind=? AND id=?',(current['id'],kind,id)).fetchone()
+            if not old:return {'deleted':True,'revision':tombstone['revision'] if tombstone else None,'local_device_data_unchanged':True}
+            if expected_revision is not None and expected_revision!=old['revision']:raise Problem(409,'Gegevens zijn op een ander toestel gewijzigd.','revision_conflict')
+            counter=con.execute("SELECT value FROM server_state WHERE key='document_revision'").fetchone();revision=int(counter['value'])+1 if counter else 1
+            con.execute("INSERT INTO server_state VALUES('document_revision',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(str(revision),))
+            con.execute('DELETE FROM documents WHERE user_id=? AND kind=? AND id=?',(current['id'],kind,id))
+            con.execute('INSERT INTO document_tombstones VALUES(?,?,?,?,?) ON CONFLICT(user_id,kind,id) DO UPDATE SET revision=excluded.revision,deleted_at=excluded.deleted_at',(current['id'],kind,id,revision,int(time.time())))
+        return {'deleted':True,'revision':revision,'local_device_data_unchanged':True}
     install_accounts(app, db, user, Problem)
+    install_navigation(app, db, user, Problem)
     return app

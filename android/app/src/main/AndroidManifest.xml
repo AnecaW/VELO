@@ -12,8 +12,9 @@
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation"/>
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
     <application
+        android:usesCleartextTraffic="${veloCleartextTraffic}"
         android:allowBackup="false"
-        android:label="Ultimate Bike Computer"
+        android:label="VELO"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

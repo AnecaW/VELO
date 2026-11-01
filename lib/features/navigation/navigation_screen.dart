@@ -7,7 +7,6 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:bike_computer/core/runtime.dart';
@@ -200,9 +199,9 @@ class _NavigationScreenState extends State<NavigationScreen> {
 
   Future<void> _calculate() async {
     setState(() => busy = true);
-    final client = RoutingClient();
+    final client = RoutingClient(accounts: Runtime.accounts);
     try {
-      final key = await const FlutterSecureStorage().read(key: 'ors-key') ?? '';
+      const key = ''; // Credentials are managed by VELO, never by the rider.
       final parts = dest.text.split(',');
       NavPoint? destination;
       if (parts.length == 2 &&
@@ -342,9 +341,9 @@ class _NavigationScreenState extends State<NavigationScreen> {
     }
     rerouting = true;
     lastReroute = DateTime.now();
-    final client = RoutingClient();
+    final client = RoutingClient(accounts: Runtime.accounts);
     try {
-      final key = await const FlutterSecureStorage().read(key: 'ors-key') ?? '';
+      const key = ''; // Credentials are managed by VELO, never by the rider.
       final next = await client.route(
         NavPoint(p.latitude, p.longitude),
         route!.points.last,

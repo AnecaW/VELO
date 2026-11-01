@@ -10,6 +10,7 @@ class AppSettings extends ChangeNotifier {
   T value<T>(String key, T fallback) =>
       _values[key] is T ? _values[key] as T : fallback;
   Future<void> load() async {
+    _values.clear();
     final raw = await database.getDocument('settings', 'app');
     if (raw != null) _values.addAll(jsonDecode(raw) as Map<String, dynamic>);
     notifyListeners();

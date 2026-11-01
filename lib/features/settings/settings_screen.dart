@@ -12,7 +12,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:bike_computer/core/runtime.dart';
 import 'package:bike_computer/core/platform_bridge.dart';
@@ -83,47 +82,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           update(() {});
         },
       );
-  Future<void> _key() async {
-    final controller = TextEditingController();
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('openrouteservice API-sleutel'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Bij routeberekening worden je startpunt en bestemming naar openrouteservice verzonden. De sleutel blijft in Android beveiligde opslag.',
-            ),
-            TextField(
-              controller: controller,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Persoonlijke API-sleutel',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Annuleren'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              await const FlutterSecureStorage().write(
-                key: 'ors-key',
-                value: controller.text.trim(),
-              );
-              if (ctx.mounted) Navigator.pop(ctx);
-            },
-            child: const Text('Opslaan'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-  }
 
   Future<void> _offline() async {
     try {
@@ -343,7 +301,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 },
               ),
               const Text(
-                'GPX-spoorbegeleiding werkt offline. Nieuwe routes en herberekening vereisen internet en een API-sleutel. Gravel, rondritten en specifieke wegvermijding zijn nog niet beschikbaar.',
+                'GPX-begeleiding werkt offline. Voor nieuwe routes en herberekening heb je verbinding met VELO nodig.',
               ),
             ],
           ),
@@ -393,15 +351,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             'Integrations',
             (update) => [
               FilledButton(
-                onPressed: _key,
-                child: const Text('openrouteservice configureren'),
-              ),
-              FilledButton(
                 onPressed: () => _page(const IntegrationsScreen()),
                 child: const Text('Verbonden apps · Privacy & Synchronisatie'),
               ),
               const Text(
-                'Verbonden apps toont per dienst de echte mogelijkheden en benodigde configuratie. openrouteservice wordt afzonderlijk ingesteld voor routering.',
+                'Koppel je favoriete apps en kies welke gegevens je wilt delen.',
               ),
             ],
           ),
@@ -473,7 +427,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             'Gegevensbeheer',
             (update) => [
               const Text(
-                'Een back-up bevat persoonlijke GPS-sporen, routes en instellingen. Tokens en API-sleutels worden niet meegenomen. Bewaar het bestand zelf veilig.',
+                'Een back-up bevat persoonlijke GPS-sporen, routes en instellingen. Je aanmeldgegevens worden niet meegenomen. Bewaar het bestand zelf veilig.',
               ),
               FilledButton(
                 onPressed: () async {

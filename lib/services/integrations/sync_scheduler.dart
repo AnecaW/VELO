@@ -1,4 +1,5 @@
 import '../accounts/account_service.dart';
+import '../accounts/account_sync.dart';
 import 'backend_strava.dart';
 
 import 'dart:async';
@@ -18,7 +19,7 @@ import 'sync_engine.dart';
 void integrationBackgroundDispatcher() {
   Workmanager().executeTask((task, input) async {
     final db = BikeComputerDatabase();
-    final accounts = AccountService();
+    final accounts = AccountService(refreshMutex: db.withAccountRefreshLock);
     await accounts.restore();
     final strava = BackendStravaService(db, accounts);
     final engine = SyncEngine(
@@ -26,6 +27,12 @@ void integrationBackgroundDispatcher() {
       SyncRepository(db),
     );
     try {
+      final accountSync = AccountSync(db, accounts);
+      try {
+        await accountSync.run();
+      } finally {
+        accountSync.dispose();
+      }
       await (engine.provider as StravaIntegration).cache.expire();
       if (task == 'strava-cleanup') return true;
       return await engine.run(trigger: 'background');
@@ -45,7 +52,8 @@ class IntegrationCoordinator with WidgetsBindingObserver {
   Timer? _cleanup;
   bool _initialized = false, _callbackBusy = false;
   String? oauthMessage;
-  IntegrationCoordinator(this.strava);
+  final Future<void> Function()? syncAccount;
+  IntegrationCoordinator(this.strava, {this.syncAccount});
   Future<void> initialize() async {
     if (_initialized || !Platform.isAndroid) return;
     _initialized = true;
@@ -54,9 +62,10 @@ class IntegrationCoordinator with WidgetsBindingObserver {
     _links = links.uriLinkStream.listen((uri) => handleLink(uri));
     final initial = await links.getInitialLink();
     if (initial != null) await handleLink(initial);
-    _network = Connectivity().onConnectivityChanged.listen(
-      (_) => engine.run(trigger: 'network'),
-    );
+    _network = Connectivity().onConnectivityChanged.listen((_) {
+      unawaited(syncAccount?.call() ?? Future.value());
+      unawaited(engine.run(trigger: 'network'));
+    });
     _cleanup = Timer.periodic(
       const Duration(minutes: 1),
       (_) => strava.cache.expire(),
@@ -86,7 +95,9 @@ class IntegrationCoordinator with WidgetsBindingObserver {
       await schedule();
       unawaited(engine.run(trigger: 'open'));
     } catch (e) {
-      oauthMessage = e is IntegrationFailure ? e.message : 'Authenticatie kon niet worden afgerond. Controleer de backendconfiguratie en probeer opnieuw.';
+      oauthMessage = e is IntegrationFailure
+          ? e.message
+          : 'Verbinden is niet gelukt. Probeer opnieuw.';
       await strava.repository.update('strava', {'error': oauthMessage});
     } finally {
       _callbackBusy = false;
@@ -141,6 +152,7 @@ class IntegrationCoordinator with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      unawaited(syncAccount?.call() ?? Future.value());
       strava.cache.expire();
       engine.run(trigger: 'open');
     }

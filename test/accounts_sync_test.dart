@@ -461,7 +461,8 @@ void main() {
     );
     await tester.pump();
     expect(find.text('Niet verbonden'), findsOneWidget);
-    expect(find.text('Publiek Strava client-ID'), findsOneWidget);
+    expect(find.text('Publiek Strava client-ID'), findsNothing);
+    expect(find.byType(TextField), findsNothing);
     await tester.pumpWidget(const SizedBox());
     coordinator.dispose();
   });

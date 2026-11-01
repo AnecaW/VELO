@@ -7,9 +7,12 @@ from cryptography.fernet import Fernet
 
 def main():
     parser=argparse.ArgumentParser(prog='velo-backend')
-    parser.add_argument('command',choices=['serve','worker','backup','backup-loop','restore','generate-secrets','rotate-key','create-admin'])
+    parser.add_argument('command',choices=['serve','worker','backup','backup-loop','restore','generate-secrets','rotate-key','create-admin','updater'])
     parser.add_argument('--file');parser.add_argument('--confirm',action='store_true')
     args=parser.parse_args()
+    if args.command=='updater':
+        from .updater import run
+        run();return
     if args.command=='generate-secrets':
         # Explicit operator command, never executed automatically or by CI logs.
         print('VELO_ENCRYPTION_KEYS='+Fernet.generate_key().decode());print('VELO_BOOTSTRAP_TOKEN='+secrets.token_urlsafe(32));return

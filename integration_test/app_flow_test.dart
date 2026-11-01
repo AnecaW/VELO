@@ -18,6 +18,10 @@ void main() {
     (tester) async {
       await app.main();
       await tester.pumpAndSettle();
+      if (find.text('Verder zonder account').evaluate().isNotEmpty) {
+        await tester.tap(find.text('Verder zonder account'));
+        await tester.pumpAndSettle();
+      }
       expect(find.text('Home'), findsOneWidget);
       await tester.tap(
         find.byKey(const ValueKey('profile-chip-gravel_default')),
@@ -120,7 +124,7 @@ void main() {
       await tester.tap(find.text('Verbonden apps'));
       await tester.pumpAndSettle();
       expect(find.byType(ConnectedAppsScreen), findsOneWidget);
-      await tester.tap(find.text('GPX uitwisselen · zonder server'));
+      await tester.tap(find.text('GPX-bestanden'));
       await tester.pumpAndSettle();
       expect(find.byType(GpxExchangeScreen), findsOneWidget);
       expect(find.text('GPX-route importeren'), findsOneWidget);

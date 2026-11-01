@@ -12,6 +12,7 @@ x-backend: &backend
     VELO_DATA_DIR: /data
     VELO_PUBLIC_URL: ${VELO_PUBLIC_URL:?Set the external HTTPS origin}
     VELO_ENCRYPTION_KEYS: ${VELO_ENCRYPTION_KEYS:?Generate and securely back up encryption keys}
+    ORS_API_KEY: ${ORS_API_KEY:-}
     SMTP_HOST: ${SMTP_HOST:-}
     SMTP_PORT: ${SMTP_PORT:-587}
     SMTP_SECURITY: ${SMTP_SECURITY:-starttls}

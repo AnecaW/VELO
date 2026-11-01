@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show InternetAddress;
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -17,7 +18,9 @@ enum AccountState {
 
 class AccountFailure implements Exception {
   final String message;
-  AccountFailure(this.message);
+  final int? status;
+  final String? code;
+  AccountFailure(this.message, {this.status, this.code});
   @override
   String toString() => message;
 }
@@ -25,40 +28,35 @@ class AccountFailure implements Exception {
 class AccountService extends ChangeNotifier {
   final TokenStore store;
   final http.Client client;
-  final Future<void> Function()? onIdentityChange;
+  final Future<void> Function(String? userId)? onIdentityChange;
+  final Future<void> Function(Future<void> Function())? refreshMutex;
   AccountService({
     TokenStore? store,
     http.Client? client,
+    String? baseUrl,
     this.onIdentityChange,
+    this.refreshMutex,
   }) : store = store ?? SecureTokenStore(),
-       client = client ?? http.Client();
-  String base = const String.fromEnvironment('VELO_BACKEND_URL');
+       client = client ?? http.Client(),
+       base = (baseUrl ?? const String.fromEnvironment('VELO_BACKEND_URL'))
+           .replaceAll(RegExp(r'/+$'), '');
+  final String base;
+  static const _lanBuild = bool.fromEnvironment('VELO_LAN_MODE');
+  static bool _privateAddress(String host) {
+    final address = InternetAddress.tryParse(host);
+    if (address == null || address.rawAddress.length != 4) return false;
+    final bytes = address.rawAddress;
+    return bytes[0] == 10 ||
+        (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31) ||
+        (bytes[0] == 192 && bytes[1] == 168);
+  }
+
+  bool initialized = false;
   AccountState state = AccountState.signedOut;
   Map<String, dynamic>? user;
   String? message;
   Map<String, dynamic>? _tokens;
   Future<void>? _refreshing;
-  Future<void> configure(String value) async {
-    final uri = Uri.tryParse(value.trim());
-    if (uri == null ||
-        !uri.hasAuthority ||
-        uri.userInfo.isNotEmpty ||
-        uri.hasQuery ||
-        uri.hasFragment ||
-        (uri.path != '' && uri.path != '/') ||
-        (uri.scheme != 'https' && !(kDebugMode && uri.scheme == 'http'))) {
-      throw AccountFailure(
-        'Gebruik een HTTPS-serveradres. HTTP is alleen toegestaan in debugbuilds.',
-      );
-    }
-    final next = value.trim().replaceAll(RegExp(r'/+$'), '');
-    if (next != base) {
-      await logout();
-      base = next;
-    }
-    await store.write('velo-backend', base);
-  }
-
   void _state(AccountState value, [String? text]) {
     state = value;
     message = text;
@@ -66,15 +64,29 @@ class AccountService extends ChangeNotifier {
   }
 
   Future<void> restore() async {
-    base = await store.read('velo-backend') ?? base;
-    final raw = await store.read('velo-session');
-    if (raw == null) return;
     try {
+      final origin = await store.read('velo-session-origin');
+      // Older configurable builds must never send credentials to another origin.
+      final previous = origin ?? await store.read('velo-backend');
+      if (previous != null && previous != base) {
+        await store.write('velo-session', null);
+        return;
+      }
+      final raw = await store.read('velo-session');
+      if (raw == null) return;
       _tokens = jsonDecode(raw) as Map<String, dynamic>;
+      if (_tokens!['user'] is Map) {
+        user = Map<String, dynamic>.from(_tokens!['user']);
+      }
+      if (user != null) await onIdentityChange?.call(user?['id'] as String?);
       user = await request('GET', '/api/v1/me') as Map<String, dynamic>;
+      await onIdentityChange?.call(user?['id'] as String?);
       _state(AccountState.signedIn);
     } catch (_) {
       /* request preserves offline credentials */
+    } finally {
+      initialized = true;
+      notifyListeners();
     }
   }
 
@@ -85,11 +97,22 @@ class AccountService extends ChangeNotifier {
     String? token,
   ) async {
     if (base.isEmpty) {
-      throw AccountFailure('Stel eerst je VELO-serveradres in.');
+      throw AccountFailure(
+        'Aanmelden is tijdelijk niet beschikbaar. Je kunt blijven fietsen.',
+      );
     }
     final uri = Uri.parse(base);
-    if (uri.scheme != 'https' && !(kDebugMode && uri.scheme == 'http')) {
-      throw AccountFailure('HTTPS vereist.');
+    if (!uri.hasAuthority ||
+        uri.userInfo.isNotEmpty ||
+        uri.hasQuery ||
+        uri.hasFragment ||
+        (uri.path != '' && uri.path != '/') ||
+        (uri.scheme != 'https' &&
+            !(uri.scheme == 'http' &&
+                (kDebugMode || (_lanBuild && _privateAddress(uri.host)))))) {
+      throw AccountFailure(
+        'Er kan geen veilige verbinding met VELO worden gemaakt.',
+      );
     }
     final req = http.Request(method, Uri.parse('$base$path'));
     req.headers['Content-Type'] = 'application/json';
@@ -109,20 +132,46 @@ class AccountService extends ChangeNotifier {
     if (response.statusCode >= 400) {
       throw AccountFailure(
         data['error']?['message'] ?? 'Serververzoek mislukt.',
+        status: response.statusCode,
+        code: data['error']?['code'],
       );
     }
     return data;
   }
 
   Future<void> _refresh() async {
+    if (refreshMutex != null) return refreshMutex!(_renew);
+    return _renew();
+  }
+
+  Future<void> _renew() async {
+    final stored = await store.read('velo-session');
+    if (stored != null) {
+      final latest = Map<String, dynamic>.from(jsonDecode(stored));
+      if (latest['user']?['id'] != _tokens?['user']?['id']) {
+        _tokens = null;
+        user = null;
+        _state(AccountState.signedOut);
+        throw AccountFailure('Je account is gewijzigd. Open VELO opnieuw.');
+      }
+      if (latest['refresh_token'] != _tokens?['refresh_token'] &&
+          (latest['expires_at'] as num) * 1000 >
+              DateTime.now().millisecondsSinceEpoch + 30000) {
+        _tokens = latest;
+        return;
+      }
+    }
     try {
       final next = await _send('POST', '/api/v1/accounts/refresh', {
         'refresh_token': _tokens?['refresh_token'],
       }, null);
-      _tokens = Map<String, dynamic>.from(next);
+      _tokens = {
+        ...Map<String, dynamic>.from(next),
+        'user': user ?? _tokens?['user'],
+      };
       await store.write('velo-session', jsonEncode(_tokens));
     } on _Unauthorized {
-      await onIdentityChange?.call();
+      await onIdentityChange?.call(null);
       _tokens = null;
       user = null;
       await store.write('velo-session', null);
@@ -180,13 +229,24 @@ class AccountService extends ChangeNotifier {
     } catch (_) {
       _state(
         AccountState.unavailable,
-        'VELO-server niet bereikbaar. Je fietscomputer blijft lokaal werken.',
+        'VELO is tijdelijk niet bereikbaar. Je fietscomputer blijft werken. Probeer later opnieuw.',
       );
       throw AccountFailure(message!);
     }
   }
 
   Future<void> login(
+    String email,
+    String password, {
+    bool register = false,
+  }) async {
+    if (refreshMutex != null) {
+      return refreshMutex!(() => _login(email, password, register: register));
+    }
+    return _login(email, password, register: register);
+  }
+
+  Future<void> _login(
     String email,
     String password, {
     bool register = false,
@@ -201,9 +261,11 @@ class AccountService extends ChangeNotifier {
           authenticated: false,
         ),
       );
-      await onIdentityChange?.call();
+      await onIdentityChange?.call(_tokens!['user']['id'] as String);
       user = Map<String, dynamic>.from(_tokens!['user']);
       await store.write('velo-session', jsonEncode(_tokens));
+      await store.write('velo-session-origin', base);
+      initialized = true;
       _state(AccountState.signedIn);
     } on AccountFailure catch (e) {
       if (state == AccountState.signingIn) {
@@ -214,6 +276,11 @@ class AccountService extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    if (refreshMutex != null) return refreshMutex!(_logout);
+    return _logout();
+  }
+
+  Future<void> _logout() async {
     final refresh = _tokens?['refresh_token'];
     if (refresh != null) {
       // Retain credentials when revocation cannot be confirmed; let the user retry.
@@ -224,7 +291,7 @@ class AccountService extends ChangeNotifier {
         authenticated: false,
       );
     }
-    await onIdentityChange?.call();
+    await onIdentityChange?.call(null);
     _tokens = null;
     user = null;
     await store.write('velo-session', null);
@@ -232,7 +299,12 @@ class AccountService extends ChangeNotifier {
   }
 
   Future<void> deleted() async {
-    await onIdentityChange?.call();
+    if (refreshMutex != null) return refreshMutex!(_deleted);
+    return _deleted();
+  }
+
+  Future<void> _deleted() async {
+    await onIdentityChange?.call(null);
     _tokens = null;
     user = null;
     await store.write('velo-session', null);

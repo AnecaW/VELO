@@ -35,7 +35,7 @@ class ConnectedAppsScreen extends StatelessWidget {
         Card(
           child: ListTile(
             leading: const Icon(Icons.file_present_outlined),
-            title: const Text('GPX uitwisselen Â· zonder server'),
+            title: const Text('GPX-bestanden'),
             subtitle: const Text(
               'Eigen ritten exporteren, routes importeren en zelf uploaden. Geen accountkoppeling nodig.',
             ),
@@ -50,7 +50,7 @@ class ConnectedAppsScreen extends StatelessWidget {
         ),
         ListTile(
           title: const Text('VELO-account'),
-          subtitle: const Text('Aanmelden bij je eigen server'),
+          subtitle: const Text('Je account en gekoppelde apps'),
           leading: const Icon(Icons.person_outline),
           onTap: () => Navigator.push(
             context,
@@ -77,21 +77,23 @@ class ConnectedAppsScreen extends StatelessWidget {
           style: Theme.of(context).textTheme.titleLarge,
         ),
         const Text(
-          'Dit zijn geen gekoppelde accounts. Alleen geÃ¯mplementeerde en geconfigureerde adapters kunnen verbinding maken.',
+          'Deze diensten zijn nog niet rechtstreeks beschikbaar in VELO. Je kunt wel GPX-bestanden uitwisselen.',
         ),
         for (final service in IntegrationRegistry.services.skip(1))
           Card(
             child: ListTile(
               leading: const Icon(Icons.info_outline),
               title: Text(service.name),
-              subtitle: Text('${service.description}\n${service.availability}'),
+              subtitle: const Text(
+                'Nog niet rechtstreeks beschikbaar in VELO.',
+              ),
               isThreeLine: false,
               onTap: () => showDialog<void>(
                 context: context,
                 builder: (ctx) => AlertDialog(
                   title: Text(service.name),
-                  content: Text(
-                    '${service.description}\n\n${service.availability}\n\nGPX-bestanden kun je via Kaart â†’ GPX importeren openen. Er wordt niet ingelogd of privÃ©data uitgelezen.',
+                  content: const Text(
+                    'Deze dienst is nog niet rechtstreeks gekoppeld aan VELO. Er worden geen gegevens opgehaald of gedeeld. GPX-bestanden kun je via de kaart importeren.',
                   ),
                   actions: [
                     TextButton(
@@ -99,7 +101,7 @@ class ConnectedAppsScreen extends StatelessWidget {
                         Uri.parse(service.url),
                         mode: LaunchMode.externalApplication,
                       ),
-                      child: const Text('OfficiÃ«le informatie'),
+                      child: const Text('Officiële informatie'),
                     ),
                     TextButton(
                       onPressed: () => Navigator.pop(ctx),
@@ -122,7 +124,7 @@ class _StravaHubCard extends StatefulWidget {
 }
 
 class _StravaHubCardState extends State<_StravaHubCard> {
-  String status = 'Status controlerenâ€¦', last = 'nog geen';
+  String status = 'Status controleren…', last = 'nog geen';
   Timer? timer;
   @override
   void initState() {
@@ -145,9 +147,9 @@ class _StravaHubCardState extends State<_StravaHubCard> {
       if (mounted) {
         setState(() {
           status = c.engine.busy
-              ? 'Synchroniserenâ€¦'
+              ? 'Synchroniseren…'
               : pending != null
-              ? 'Verbindenâ€¦'
+              ? 'Verbinden…'
               : a == null
               ? 'Niet verbonden'
               : s['status'] ?? 'Verbonden';
@@ -166,7 +168,7 @@ class _StravaHubCardState extends State<_StravaHubCard> {
       leading: const Icon(Icons.sync, size: 32),
       title: const Text('Strava'),
       subtitle: Text(
-        'OfficiÃ«le OAuth Â· activiteiten, routes en optionele uploads\n$status\nLaatste synchronisatie: $last',
+        'Activiteiten, routes en ritten delen\n$status\nLaatste synchronisatie: $last',
       ),
       trailing: const Icon(Icons.chevron_right),
       onTap: () async {
@@ -198,7 +200,7 @@ class _StravaAccountScreenState extends State<StravaAccountScreen> {
   late final provider = coordinator.strava,
       service = provider.service,
       repo = provider.repository;
-  final backend = TextEditingController(), client = TextEditingController();
+  bool configured = false;
   SyncPreferences preferences = const SyncPreferences();
   Map<String, dynamic>? account;
   Map<String, dynamic> state = {};
@@ -228,7 +230,15 @@ class _StravaAccountScreenState extends State<StravaAccountScreen> {
     _reading = true;
     try {
       await provider.cache.expire();
-      if (service is BackendStravaService) await (service as BackendStravaService).refreshStatus();
+      if (service is BackendStravaService) {
+        await (service as BackendStravaService).refreshStatus();
+      }
+      if (service is BackendStravaService) {
+        configured =
+            (await (service as BackendStravaService)
+                .information())['configured'] ==
+            true;
+      }
       final a = await service.account(),
           p = await repo.preferences('strava'),
           s = await repo.state('strava');
@@ -240,12 +250,6 @@ class _StravaAccountScreenState extends State<StravaAccountScreen> {
             ..sort((a, b) => b['date'].compareTo(a['date']));
       final j = await Runtime.database.documents('sync');
       if (initial) {
-        backend.text =
-            await service.store.read('strava-base') ??
-            const String.fromEnvironment('STRAVA_BACKEND_URL');
-        client.text =
-            await service.store.read('strava-client-id') ??
-            const String.fromEnvironment('STRAVA_CLIENT_ID', defaultValue: '');
         privateData = await service.store.read('strava-private') == 'true';
       }
       final pending = await service.store.read('strava-state');
@@ -326,7 +330,7 @@ class _StravaAccountScreenState extends State<StravaAccountScreen> {
         value &&
         !await _confirm(
           'Ritten delen met Strava?',
-          'Handmatig gekozen of expliciet automatisch geselecteerde ritten worden als GPX inclusief GPS-spoor en tijdstippen naar Strava verstuurd. Dit vereist activity:write.',
+          'Handmatig gekozen of expliciet automatisch geselecteerde ritten worden als GPX inclusief GPS-spoor en tijdstippen naar Strava verstuurd. Je geeft hiervoor toestemming in Strava.',
         )) {
       return;
     }
@@ -358,30 +362,29 @@ class _StravaAccountScreenState extends State<StravaAccountScreen> {
       if (preferences.uploads) 'activity:write',
     ];
     if (requested.isEmpty) {
-      throw const IntegrationFailure('Kies minstens Ã©Ã©n gegevenscategorie.');
+      throw const IntegrationFailure('Kies minstens één gegevenscategorie.');
     }
-    await service.store.write('strava-client-id', client.text.trim());
     await service.store.write('strava-private', privateData.toString());
     await service.authorize(
-      backend.text.trim(),
-      client.text.trim(),
+      await service.store.read('strava-base') ?? '',
+      await service.store.read('strava-client-id') ?? '',
       scopes: requested,
     );
-    message = 'Rond de officiÃ«le Strava-aanmelding af. Tik op de terugkeerknop op je backendpagina. Deel geen codes of tokens.';
+    message = 'Geef toestemming in Strava en keer daarna terug naar VELO.';
   });
   String get status => coordinator.engine.busy
-      ? 'Synchroniserenâ€¦'
+      ? 'Synchroniseren…'
       : busy
-      ? 'Bezigâ€¦'
+      ? 'Bezig…'
       : connecting
-      ? 'Verbindenâ€¦'
+      ? 'Verbinden…'
       : account == null
       ? 'Niet verbonden'
       : state['status'] ?? 'Verbonden';
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Strava Â· account'),
+      title: const Text('Strava · account'),
       actions: [
         IconButton(
           tooltip: 'Status vernieuwen',
@@ -409,7 +412,7 @@ class _StravaAccountScreenState extends State<StravaAccountScreen> {
                       Text(status, key: const ValueKey('strava-status')),
                       if (account?['athlete'] != null)
                         Text(
-                          '${account!['athlete']['firstname'] ?? ''} ${account!['athlete']['lastname'] ?? ''} Â· account ${account!['athlete']['id']}',
+                          '${account!['athlete']['firstname'] ?? ''} ${account!['athlete']['lastname'] ?? ''} · account ${account!['athlete']['id']}',
                         ),
                       Text(
                         'Laatste geslaagde synchronisatie: ${state['lastSuccess'] ?? 'nog geen'}',
@@ -438,48 +441,18 @@ class _StravaAccountScreenState extends State<StravaAccountScreen> {
                     ),
                   ),
                 ),
-              if (account == null && service is BackendStravaService)
-                const Padding(
-                  padding: EdgeInsets.all(12),
+              if (account == null)
+                Padding(
+                  padding: const EdgeInsets.all(12),
                   child: Text(
-                    'Meld je eerst aan bij VELO. De beheerder configureert Strava op de server; client secrets blijven daar.',
+                    Runtime.accounts.user == null &&
+                            service is BackendStravaService
+                        ? 'Meld je aan bij VELO om Strava te verbinden.'
+                        : service is BackendStravaService && !configured
+                        ? 'Strava is momenteel niet beschikbaar in VELO. Probeer later opnieuw.'
+                        : 'Verbind je Strava-account. Jij kiest welke gegevens je deelt.',
                   ),
                 ),
-              if (account == null && service is! BackendStravaService) ...[
-                Text(
-                  'Zonder server: GPX-uitwisseling',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const Text(
-                  'Client-ID 292844 en callbackdomein localhost zijn onvoldoende voor veilige zelfstandige OAuth: Strava vereist ook een client secret bij de tokenuitwisseling. De app bewaart geen client secrets. Zonder server zijn automatische accountkoppeling en synchronisatie daarom niet beschikbaar. GPX-uitwisseling werkt wel. Onderstaande backendconfiguratie is uitsluitend optioneel voor een latere keuze.',
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute<void>(
-                      builder: (_) => const GpxExchangeScreen(),
-                    ),
-                  ),
-                  child: const Text('GPX uitwisselen zonder server'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: backend,
-                  onChanged: (_) => setState(() {}),
-                  decoration: const InputDecoration(
-                    labelText: 'OAuth-backend Â· https://â€¦',
-                  ),
-                  keyboardType: TextInputType.url,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: client,
-                  decoration: const InputDecoration(
-                    labelText: 'Publiek Strava client-ID',
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
-              ],
               const SizedBox(height: 16),
               Text(
                 'Privacy & Synchronisatie',
@@ -497,22 +470,22 @@ class _StravaAccountScreenState extends State<StravaAccountScreen> {
                 (
                   'activities',
                   'Activiteiten ophalen',
-                  'Recente zeven dagen, maximaal 200 activiteiten per poging; alleen je eigen account.',
+                  'Je recente activiteiten verschijnen automatisch in VELO.',
                 ),
                 (
                   'routes',
                   'Routes ophalen',
-                  'Maximaal tien routes; tijdelijk lokaal voor kaartgebruik.',
+                  'Je recente routes gebruiken op de kaart.',
                 ),
                 (
                   'uploads',
                   'Ritten naar Strava versturen',
-                  'Alleen geselecteerde eigen ritten; geen geÃ¯mporteerde activiteiten.',
+                  'Alleen geselecteerde eigen ritten; geen geïmporteerde activiteiten.',
                 ),
                 (
                   'automatic',
                   'Automatisch synchroniseren',
-                  'Android plant achtergrondwerk ongeveer iedere zes uur. Timing is niet gegarandeerd.',
+                  'Je gegevens blijven op de achtergrond bijgewerkt.',
                 ),
                 (
                   'onOpen',
@@ -522,7 +495,7 @@ class _StravaAccountScreenState extends State<StravaAccountScreen> {
                 (
                   'afterRide',
                   'Na een opgeslagen rit',
-                  'Voegt de nieuwe eigen rit toe als uploaden Ã©n automatisch aanstaan.',
+                  'Voegt de nieuwe eigen rit toe als uploaden én automatisch aanstaan.',
                 ),
                 (
                   'onNetwork',
@@ -546,16 +519,16 @@ class _StravaAccountScreenState extends State<StravaAccountScreen> {
                 ),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Ook privÃ©activiteiten / privÃ©routes'),
+                title: const Text('Ook privéactiviteiten / privéroutes'),
                 subtitle: const Text(
-                  'Vraagt bij opnieuw verbinden aanvullende read_all-rechten.',
+                  'Geef opnieuw toestemming om ook deze gegevens op te halen.',
                 ),
                 value: privateData,
                 onChanged: busy ? null : (v) => setState(() => privateData = v),
               ),
               if (account == null &&
-                  (service is BackendStravaService ||
-                      backend.text.trim().startsWith('https://')))
+                  (service is! BackendStravaService ||
+                      (configured && Runtime.accounts.user != null)))
                 Semantics(
                   button: true,
                   label: 'Connect with Strava',
@@ -579,23 +552,8 @@ class _StravaAccountScreenState extends State<StravaAccountScreen> {
                   child: Text(
                     account == null
                         ? 'Connect with Strava'
-                        : 'Opnieuw verbinden / rechten wijzigen',
+                        : 'Toestemming aanpassen',
                   ),
-                ),
-              if (account == null &&
-                  service is! BackendStravaService &&
-                  !backend.text.trim().startsWith('https://'))
-                const ListTile(
-                  leading: Icon(Icons.lock_outline),
-                  title: Text('Accountkoppeling niet geconfigureerd'),
-                  subtitle: Text(
-                    'Geen server ingesteld. Er wordt geen OAuth-aanmelding of automatische synchronisatie gestart.',
-                  ),
-                ),
-              if (connecting)
-                TextButton(
-                  onPressed: () => _run(service.cancelAuthorization),
-                  child: const Text('Aanmelding annuleren'),
                 ),
               if (account != null) ...[
                 OutlinedButton(
@@ -641,7 +599,7 @@ class _StravaAccountScreenState extends State<StravaAccountScreen> {
                       ? null
                       : () => _run(() async {
                           if (!await _confirm(
-                            'GeÃ¯mporteerde gegevens verwijderen?',
+                            'Geïmporteerde gegevens verwijderen?',
                             'Verwijdert alleen de tijdelijke Strava-activiteiten en -routes op dit toestel.',
                           )) {
                             return;
@@ -656,7 +614,7 @@ class _StravaAccountScreenState extends State<StravaAccountScreen> {
                       : () => _run(() async {
                           if (!await _confirm(
                             'Strava ontkoppelen?',
-                            'Trekt toegang online in waar mogelijk en verwijdert lokale tokens, Strava-cache en wachtrij. Je eigen opgenomen ritten blijven behouden.',
+                            'Ontkoppelt Strava en verwijdert de opgehaalde Strava-gegevens. Je eigen ritten blijven bewaard.',
                           )) {
                             return;
                           }
@@ -693,7 +651,7 @@ class _StravaAccountScreenState extends State<StravaAccountScreen> {
                         ListTile(
                           title: Text('${ride.startTime ?? 'Geen starttijd'}'),
                           subtitle: Text(
-                            '${ride.totalDistance.toStringAsFixed(1)} km Â· lokaal opgenomen',
+                            '${ride.totalDistance.toStringAsFixed(1)} km · lokaal opgenomen',
                           ),
                           trailing: TextButton(
                             onPressed: !preferences.uploads || busy
@@ -728,8 +686,13 @@ class _StravaAccountScreenState extends State<StravaAccountScreen> {
                     final j = jsonDecode(row.value);
                     return ListTile(
                       title: Text(row.key),
-                      subtitle: Text('${j['status']} Â· ${j['error'] ?? ''}'),
-                      trailing: j['status'] == 'failed'
+                      subtitle: Text('${j['status']} · ${j['error'] ?? ''}'),
+                      trailing:
+                          [
+                            'failed',
+                            'needs_review',
+                            'unknown',
+                          ].contains(j['status'])
                           ? TextButton(
                               onPressed: () => _run(() async {
                                 if (!await _confirm(
@@ -738,15 +701,25 @@ class _StravaAccountScreenState extends State<StravaAccountScreen> {
                                 )) {
                                   return;
                                 }
-                                await Runtime.database.putDocument(
-                                  'sync',
-                                  row.key,
-                                  jsonEncode({
-                                    ...j,
-                                    'status': 'pending',
-                                    'next': 0,
-                                  }),
-                                );
+                                if (service is BackendStravaService) {
+                                  await (service as BackendStravaService)
+                                      .accounts
+                                      .request(
+                                        'POST',
+                                        '/api/v1/jobs/${j['job_id']}/retry',
+                                        body: {'confirmed_no_duplicate': true},
+                                      );
+                                } else {
+                                  await Runtime.database.putDocument(
+                                    'sync',
+                                    row.key,
+                                    jsonEncode({
+                                      ...j,
+                                      'status': 'pending',
+                                      'next': 0,
+                                    }),
+                                  );
+                                }
                               }),
                               child: const Text('Opnieuw'),
                             )
@@ -764,7 +737,7 @@ class _StravaAccountScreenState extends State<StravaAccountScreen> {
                 ListTile(
                   title: Text(row['message']),
                   subtitle: Text(
-                    '${row['date']} Â· ${row['trigger']} Â· ${row['status']}',
+                    '${row['date']} · ${row['trigger']} · ${row['status']}',
                   ),
                 ),
             ],
@@ -774,8 +747,6 @@ class _StravaAccountScreenState extends State<StravaAccountScreen> {
   void dispose() {
     refresh?.cancel();
     coordinator.engine.removeListener(_changed);
-    backend.dispose();
-    client.dispose();
     super.dispose();
   }
 }
@@ -837,7 +808,7 @@ class _StravaDataScreenState extends State<StravaDataScreen> {
                 child: ListTile(
                   title: Text(a['name'] ?? 'Activiteit zonder naam'),
                   subtitle: Text(
-                    '${a['distance'] / 1000} km Â· ${a['moving_time']} s in beweging\nStrava Â· gesynchroniseerd ${row['synced']}',
+                    '${a['distance'] / 1000} km · ${a['moving_time']} s in beweging\nStrava · gesynchroniseerd ${row['synced']}',
                   ),
                   onTap: busy
                       ? null
@@ -888,7 +859,7 @@ class _StravaDataScreenState extends State<StravaDataScreen> {
           ListTile(
             title: Text(NavRoute.decode(row.value).name),
             subtitle: const Text(
-              'Strava Â· tijdelijk lokaal Â· ook in Kaart â†’ Lokale routes',
+              'Strava · tijdelijk lokaal · ook in Kaart → Lokale routes',
             ),
             onTap: () => Navigator.push(
               context,

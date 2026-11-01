@@ -116,7 +116,7 @@ def install_accounts(app, db, user, Problem):
     def reset(body: ResetRequest, request: Request, background: BackgroundTasks):
         limit(request, 'password-reset', 5)
         if not db.settings.smtp_ready:
-            raise Problem(503, 'Wachtwoordherstel is nog niet beschikbaar: de beheerder moet e-mail configureren.', 'email_not_configured')
+            raise Problem(503, 'Wachtwoordherstel is momenteel niet beschikbaar. Neem contact op met VELO.', 'email_not_configured')
         with db.connect(True) as con:
             account = con.execute('SELECT id,email FROM users WHERE email=?', (body.email.strip().lower(),)).fetchone()
             if account:

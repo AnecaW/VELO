@@ -8,7 +8,6 @@ import 'package:bike_computer/services/navigation/offline_maps.dart';
 import 'package:bike_computer/services/navigation/gpx_route.dart';
 import 'package:bike_computer/services/navigation/routing_client.dart';
 import 'package:bike_computer/widgets/vector_route_map.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:latlong2/latlong.dart';
 
 class MapSettingsScreen extends StatefulWidget {
@@ -27,7 +26,7 @@ class _MapSettingsScreenState extends State<MapSettingsScreen> {
       padding: const EdgeInsets.all(20),
       children: [
         const Text(
-          'MapLibre Native · echte vectorkaarten',
+          'Kies je kaartstijl',
           style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 12),
@@ -54,29 +53,31 @@ class _MapSettingsScreenState extends State<MapSettingsScreen> {
               },
             ),
           ),
-        TextField(
-          controller: url,
-          decoration: const InputDecoration(
-            labelText: 'Eigen MapLibre style.json URL · HTTPS',
+        if (const bool.fromEnvironment('VELO_DEVELOPER_TOOLS')) ...[
+          TextField(
+            controller: url,
+            decoration: const InputDecoration(
+              labelText: 'Eigen MapLibre style.json URL · HTTPS',
+            ),
           ),
-        ),
-        OutlinedButton(
-          onPressed: () async {
-            final uri = Uri.tryParse(url.text.trim());
-            if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
-              setState(() => error = 'Voer een geldige HTTPS-stijl in');
-              return;
-            }
-            await Runtime.settings.set('customStyle', uri.toString());
-            await Runtime.settings.set('mapStyle', 'custom');
-            await Runtime.settings.set('mapEngine', 'vector');
-            if (mounted) setState(() {});
-          },
-          child: const Text('Eigen provider / satellietstijl gebruiken'),
-        ),
-        const Text(
-          'Eigen stijl vereist een geldige providerconfiguratie en toegestane gebruiksrechten. Satelliet is alleen beschikbaar wanneer die stijl echte satellietbronnen bevat. Gebiedsdownload voor eigen providers is niet automatisch toegestaan. Google Maps is geen MapLibre-provider en is niet geconfigureerd.',
-        ),
+          OutlinedButton(
+            onPressed: () async {
+              final uri = Uri.tryParse(url.text.trim());
+              if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
+                setState(() => error = 'Voer een geldige HTTPS-stijl in');
+                return;
+              }
+              await Runtime.settings.set('customStyle', uri.toString());
+              await Runtime.settings.set('mapStyle', 'custom');
+              await Runtime.settings.set('mapEngine', 'vector');
+              if (mounted) setState(() {});
+            },
+            child: const Text('Eigen provider / satellietstijl gebruiken'),
+          ),
+          const Text(
+            'Eigen stijl vereist een geldige providerconfiguratie en toegestane gebruiksrechten. Satelliet is alleen beschikbaar wanneer die stijl echte satellietbronnen bevat. Gebiedsdownload voor eigen providers is niet automatisch toegestaan. Google Maps is geen MapLibre-provider en is niet geconfigureerd.',
+          ),
+        ],
         SwitchListTile(
           title: const Text('Uitsluitend offline kaarten gebruiken'),
           value: Runtime.settings.value('mapOffline', false),
@@ -287,9 +288,7 @@ class _OfflineMapsScreenState extends State<OfflineMapsScreen> {
         title: const Text('Plaats of regio zoeken'),
         content: TextField(
           controller: query,
-          decoration: const InputDecoration(
-            labelText: 'Plaatsnaam · openrouteservice',
-          ),
+          decoration: const InputDecoration(labelText: 'Plaatsnaam'),
         ),
         actions: [
           TextButton(
@@ -305,9 +304,9 @@ class _OfflineMapsScreenState extends State<OfflineMapsScreen> {
     );
     query.dispose();
     if (text == null) return;
-    final client = RoutingClient();
+    final client = RoutingClient(accounts: Runtime.accounts);
     try {
-      final key = await const FlutterSecureStorage().read(key: 'ors-key') ?? '';
+      const key = ''; // Credentials are managed by VELO, never by the rider.
       final results = await client.search(text, key);
       if (!mounted) return;
       final selected = await showDialog<NavPoint>(
