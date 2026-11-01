@@ -117,6 +117,17 @@ class SyncEngine extends ChangeNotifier {
       );
       return true;
     } catch (e) {
+      if (e is IntegrationPending) {
+        await repository.update(provider.id, {
+          'status': 'Synchronisatie bezig',
+          'error': null,
+          'next': now()
+              .add(const Duration(seconds: 30))
+              .toUtc()
+              .toIso8601String(),
+        });
+        return true;
+      }
       final failure = e is IntegrationFailure
           ? e
           : const IntegrationFailure(

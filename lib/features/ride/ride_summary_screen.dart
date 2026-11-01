@@ -1,3 +1,5 @@
+import '../integrations/strava_upload_card.dart';
+
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -194,6 +196,9 @@ class _RideSummaryScreenState extends State<RideSummaryScreen> {
   Widget _buildActions(BuildContext context) {
     return Column(
       children: [
+        if (widget.session.id != null)
+          StravaUploadCard(rideId: widget.session.id!),
+        const SizedBox(height: 12),
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(

@@ -14,5 +14,5 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      - run: deno check supabase/functions/velo-api/index.ts supabase/functions/velo-worker/index.ts
-      - run: deno test --allow-env supabase/functions/security_test.ts supabase/functions/strava_test.ts
+      - run: deno check supabase/functions/velo-api/index.ts supabase/functions/velo-worker/index.ts supabase/functions/velo-webhook/index.ts
+      - run: deno test --allow-env supabase/functions/security_test.ts supabase/functions/strava_test.ts supabase/functions/strava_jobs_test.ts

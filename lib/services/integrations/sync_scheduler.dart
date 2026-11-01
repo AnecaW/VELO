@@ -1,3 +1,4 @@
+import '../accounts/account_service.dart';
 import '../accounts/supabase_account_service.dart';
 import '../accounts/account_sync.dart';
 import 'backend_strava.dart';
@@ -106,7 +107,10 @@ class IntegrationCoordinator with WidgetsBindingObserver {
     } catch (e) {
       oauthMessage = e is IntegrationFailure
           ? e.message
+          : e is AccountFailure
+          ? e.message
           : 'Verbinden is niet gelukt. Probeer opnieuw.';
+      await strava.service.cancelAuthorization();
       await strava.repository.update('strava', {'error': oauthMessage});
     } finally {
       _callbackBusy = false;
@@ -172,7 +176,11 @@ class IntegrationCoordinator with WidgetsBindingObserver {
     } else if (await strava.connected()) {
       await strava.service.enqueue(id);
     }
-    await schedule();
+    unawaited(
+      schedule().catchError((Object _) {
+        /* The durable local queue remains available. */
+      }),
+    );
     unawaited(engine.run(trigger: 'ride'));
   }
 

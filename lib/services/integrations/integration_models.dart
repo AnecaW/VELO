@@ -15,6 +15,14 @@ class IntegrationFailure implements Exception {
   String toString() => message;
 }
 
+class IntegrationPending extends IntegrationFailure {
+  const IntegrationPending()
+    : super(
+        'Synchronisatie gaat op de achtergrond verder.',
+        retryAfter: const Duration(seconds: 30),
+      );
+}
+
 class SyncPreferences {
   final bool enabled,
       automatic,

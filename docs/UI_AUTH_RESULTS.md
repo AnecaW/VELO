@@ -1,3 +1,5 @@
+> Verslag van versie 2.4.0. De latere werkende Strava-integratie staat in [STRAVA_RESULTS.md](STRAVA_RESULTS.md).
+
 # VELO 2.4.0 — UI, Android-apps en echte mailauthenticatie
 
 Datum: 1 november 2026. Dit is het actuele resultaat; de 2.3.0-verslagen beschrijven de eerdere installatie.

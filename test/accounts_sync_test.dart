@@ -506,7 +506,7 @@ void main() {
       );
       await tester.pump();
       expect(find.text(status), findsOneWidget);
-      expect(find.textContaining('account 7'), findsOneWidget);
+      expect(find.byKey(const ValueKey('strava-status')), findsOneWidget);
       await tester.pumpWidget(const SizedBox());
       coordinator.dispose();
     });

@@ -54,7 +54,7 @@ def main():
     args = parser.parse_args()
     api = Management(args.token_file)
     if args.command == 'deploy':
-        for slug in ('velo-api', 'velo-worker'):
+        for slug in ('velo-api', 'velo-worker', 'velo-webhook'):
             api.deploy(slug)
     elif args.command == 'configure-auth':
         current = api.request('/config/auth')

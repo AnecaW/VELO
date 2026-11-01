@@ -11,7 +11,11 @@ class StravaCache {
   final BikeComputerDatabase db;
   final DateTime Function() now;
   StravaCache(this.db, {DateTime Function()? now}) : now = now ?? DateTime.now;
-  Future<void> activity(Map<String, dynamic> raw, int athlete) async {
+  Future<void> activity(
+    Map<String, dynamic> raw,
+    int athlete, {
+    DateTime? expiresAt,
+  }) async {
     for (final key in ['id', 'distance', 'moving_time', 'elapsed_time']) {
       if (raw[key] is! num || !(raw[key] as num).isFinite || raw[key] < 0) {
         throw const FormatException(
@@ -34,8 +38,7 @@ class StravaCache {
         'source': 'Strava',
         'athlete': athlete,
         'synced': now().toUtc().toIso8601String(),
-        'expires': now()
-            .add(const Duration(hours: 24))
+        'expires': (expiresAt ?? now().add(const Duration(hours: 24)))
             .toUtc()
             .toIso8601String(),
         'data': raw,
@@ -43,14 +46,21 @@ class StravaCache {
     );
   }
 
-  Future<void> route(String id, String gpx, int athlete) async {
+  Future<void> route(
+    String id,
+    String gpx,
+    int athlete, {
+    DateTime? expiresAt,
+  }) async {
     final route = parseGpx(gpx), key = 'strava:$athlete:$id';
     final metadata = {
       'source': 'Strava',
       'athlete': athlete,
       'id': id,
       'synced': now().toUtc().toIso8601String(),
-      'expires': now().add(const Duration(hours: 24)).toUtc().toIso8601String(),
+      'expires': (expiresAt ?? now().add(const Duration(hours: 24)))
+          .toUtc()
+          .toIso8601String(),
     };
     await db.transaction(() async {
       await db.putDocument('routes', key, route.encode());

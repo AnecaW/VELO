@@ -1,3 +1,5 @@
+> Actuele Strava-configuratie en praktijktests: [STRAVA.md](STRAVA.md) en [STRAVA_RESULTS.md](STRAVA_RESULTS.md). De providercredentials en webhook zijn inmiddels ingesteld.
+
 # VELO op Supabase
 
 De actieve app gebruikt uitsluitend het beheerde Supabase-project `pdooxhljbutbsotbjbrt`, via HTTPS op `https://pdooxhljbutbsotbjbrt.supabase.co`. De normale gebruiker installeert de APK, maakt een account aan en begint. Er zijn geen servervelden, eigen domein, Docker of Portainer nodig.

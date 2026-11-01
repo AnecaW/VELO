@@ -37,12 +37,12 @@ void main() {
     final service = BackendStravaService(db, accounts);
     await SyncRepository(db).savePreferences(
       'strava',
-      const SyncPreferences(uploads: true, afterRide: true),
+      const SyncPreferences(uploads: true, afterRide: true, automatic: true),
     );
     await db.putDocument(
       'ride',
       'test-ride',
-      '{"v":1,"id":"test-ride","points":[]}',
+      '{"v":1,"id":"test-ride","points":[[51,4,10,"2026-11-01T10:00:00Z"],[51.01,4.01,11,"2026-11-01T10:01:00Z"]]}',
     );
     await service.queueAfterRide('test-ride');
     await service.flushOutbox();

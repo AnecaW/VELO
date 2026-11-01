@@ -4,7 +4,7 @@ Android-fietscomputer met ritregistratie, offline kaarten, sensoren, navigatie, 
 
 ## Gebruiken
 
-1. Download de [Supabase-versie voor Android](https://github.com/AnecaW/VELO/releases/tag/android-supabase-v2.4.0) en installeer `velo-supabase.apk`.
+1. Download de [Supabase-versie voor Android](https://github.com/AnecaW/VELO/releases/tag/android-supabase-v2.5.0) en installeer `velo-supabase.apk`.
 2. Maak een nieuw VELO-account aan, bevestig je e-mail en log in. Lees je de mail op een ander toestel? Vul dan de mailcode in VELO in.
 3. Begin met fietsen. Eigen ritten, routes, profielen, trainingsplannen en instellingen synchroniseren automatisch.
 
@@ -20,7 +20,7 @@ De centrale Apps-knop toont echte te openen Android-apps met hun eigen iconen. I
 - Edge Functions voor serversecrets, providerintegraties, navigatieproxy en accountverwijdering.
 - Supabase Cron/Vault voor periodiek werk. Geen eigen server, Docker, Portainer of eigen domein nodig.
 
-Strava is voorbereid maar mist echte providercredentials. Online routeplanning mist een OpenRouteService-key. Deze diensten worden niet als werkend gepresenteerd. Supabase SMTP, e-mailbevestiging en wachtwoordherstel zijn ingeschakeld en met de echte eigenaar getest. De app bevat geen SMTP-secrets.
+Strava is verbonden via de officiële OAuth-flow, met echte activiteitimport, GPX-uploads, webhooks en veilige tokenvernieuwing. Zie [Strava-resultaten](docs/STRAVA_RESULTS.md). Online routeplanning mist nog een OpenRouteService-key. Supabase SMTP, e-mailbevestiging en wachtwoordherstel zijn ingeschakeld en met de echte eigenaar getest. De app bevat geen SMTP-secrets.
 
 ## Project
 
