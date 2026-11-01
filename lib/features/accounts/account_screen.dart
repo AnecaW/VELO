@@ -20,6 +20,7 @@ class _AccountScreenState extends State<AccountScreen> {
       password = TextEditingController(),
       nextPassword = TextEditingController();
   bool register = false, busy = false;
+  bool get uiBusy => busy || account.state == AccountState.signingIn;
   String? message;
   @override
   void initState() {
@@ -41,6 +42,8 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   Future<void> run(Future<void> Function() action) async {
+    if (busy) return;
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       busy = true;
       message = null;
@@ -64,6 +67,26 @@ class _AccountScreenState extends State<AccountScreen> {
     );
     message = 'Als dit account bestaat, ontvang je instructies per e-mail.';
   }
+
+  Future<void> allowAccountChange() async {
+    if (widget.account == null && await Runtime.hasOpenActivity()) {
+      throw AccountFailure(
+        'Bewaar eerst je lopende rit of training voordat je van account wisselt.',
+      );
+    }
+  }
+
+  Future<void> submit() => run(() async {
+    if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email.text.trim())) {
+      throw AccountFailure('Vul een geldig e-mailadres in.');
+    }
+    if (password.text.length < 12) {
+      throw AccountFailure('Gebruik een wachtwoord van minimaal 12 tekens.');
+    }
+    await allowAccountChange();
+    await account.login(email.text.trim(), password.text, register: register);
+    if (mounted) password.clear();
+  });
 
   Future<bool> confirmDelete() async =>
       await showDialog<bool>(
@@ -97,7 +120,12 @@ class _AccountScreenState extends State<AccountScreen> {
         const Text(
           'Bewaar je ritten bij je account en verbind je favoriete apps. Je fietscomputer blijft ook zonder verbinding werken.',
         ),
-        if (busy) const LinearProgressIndicator(),
+        if (account.localNetworkOnly)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Text('Deze versie werkt op je thuisnetwerk.'),
+          ),
+        if (uiBusy) const LinearProgressIndicator(),
         if (message ?? account.message case final String text)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
@@ -109,6 +137,8 @@ class _AccountScreenState extends State<AccountScreen> {
             controller: email,
             decoration: const InputDecoration(labelText: 'E-mailadres'),
             keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.username, AutofillHints.email],
             autocorrect: false,
           ),
           TextField(
@@ -118,37 +148,35 @@ class _AccountScreenState extends State<AccountScreen> {
               labelText: 'Wachtwoord · minimaal 12 tekens',
             ),
             obscureText: true,
+            textInputAction: TextInputAction.done,
+            autofillHints: [
+              register ? AutofillHints.newPassword : AutofillHints.password,
+            ],
+            onSubmitted: (_) => uiBusy ? null : submit(),
             enableSuggestions: false,
             autocorrect: false,
           ),
           const SizedBox(height: 16),
           FilledButton(
             key: const ValueKey('account-submit'),
-            onPressed: busy
-                ? null
-                : () => run(() async {
-                    await account.login(
-                      email.text.trim(),
-                      password.text,
-                      register: register,
-                    );
-                    password.clear();
-                  }),
+            onPressed: uiBusy ? null : submit,
             child: Text(register ? 'Account aanmaken' : 'Inloggen'),
           ),
           TextButton(
-            onPressed: busy ? null : () => setState(() => register = !register),
+            onPressed: uiBusy
+                ? null
+                : () => setState(() => register = !register),
             child: Text(
               register ? 'Ik heb al een account' : 'Nieuw account aanmaken',
             ),
           ),
           TextButton(
-            onPressed: busy ? null : () => run(reset),
+            onPressed: uiBusy ? null : () => run(reset),
             child: const Text('Wachtwoord vergeten'),
           ),
           if (widget.onContinueOffline != null)
             TextButton(
-              onPressed: busy ? null : widget.onContinueOffline,
+              onPressed: uiBusy ? null : widget.onContinueOffline,
               child: const Text('Verder zonder account'),
             ),
         ] else ...[
@@ -192,7 +220,9 @@ class _AccountScreenState extends State<AccountScreen> {
                   trailing: IconButton(
                     tooltip: 'Nu synchroniseren',
                     icon: const Icon(Icons.refresh),
-                    onPressed: busy ? null : () => run(Runtime.accountSync.run),
+                    onPressed: uiBusy
+                        ? null
+                        : () => run(Runtime.accountSync.run),
                   ),
                 ),
               ),
@@ -225,7 +255,7 @@ class _AccountScreenState extends State<AccountScreen> {
                               '${jsonDecode(row.value)['created']}',
                             ),
                             trailing: TextButton(
-                              onPressed: busy
+                              onPressed: uiBusy
                                   ? null
                                   : () => run(
                                       () => Runtime.accountSync.restoreVersion(
@@ -242,7 +272,7 @@ class _AccountScreenState extends State<AccountScreen> {
               },
             ),
           OutlinedButton(
-            onPressed: busy ? null : () => run(account.restore),
+            onPressed: uiBusy ? null : () => run(account.restore),
             child: const Text('Verbinding opnieuw proberen'),
           ),
           TextField(
@@ -258,9 +288,10 @@ class _AccountScreenState extends State<AccountScreen> {
             ),
           ),
           OutlinedButton(
-            onPressed: busy
+            onPressed: uiBusy
                 ? null
                 : () => run(() async {
+                    await allowAccountChange();
                     await account.request(
                       'POST',
                       '/api/v1/accounts/password',
@@ -277,18 +308,20 @@ class _AccountScreenState extends State<AccountScreen> {
             child: const Text('Wachtwoord wijzigen en sessies intrekken'),
           ),
           OutlinedButton(
-            onPressed: busy
+            onPressed: uiBusy
                 ? null
                 : () => run(() async {
+                    await allowAccountChange();
                     await Runtime.integrations.strava.cache.expire(all: true);
                     await account.logout();
                   }),
             child: const Text('Uitloggen'),
           ),
           TextButton(
-            onPressed: busy
+            onPressed: uiBusy
                 ? null
                 : () => run(() async {
+                    await allowAccountChange();
                     if (!await confirmDelete()) return;
                     await account.request(
                       'DELETE',

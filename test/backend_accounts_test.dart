@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,6 +8,12 @@ import 'package:http/testing.dart';
 import 'package:bike_computer/services/accounts/account_service.dart';
 import 'package:bike_computer/features/accounts/account_screen.dart';
 import 'package:bike_computer/features/accounts/account_gate.dart';
+import 'package:go_router/go_router.dart';
+import 'package:drift/native.dart';
+import 'package:bike_computer/core/runtime.dart';
+import 'package:bike_computer/database/bike_computer_database.dart';
+import 'package:bike_computer/services/ride/session_codec.dart';
+import 'package:bike_computer/models/ride_session.dart';
 
 import 'accounts_sync_test.dart' show Tokens;
 
@@ -17,6 +24,100 @@ Map<String, dynamic> tokens({int? expiry, String refresh = 'test-refresh'}) => {
   'user': {'id': 'rider', 'email': 'rider@example.test'},
 };
 void main() {
+  test(
+    'a delayed authenticated reply cannot restore signed-in state after logout',
+    () async {
+      final started = Completer<void>(), response = Completer<http.Response>();
+      final service = AccountService(
+        baseUrl: 'https://velo.example.test',
+        store: Tokens(),
+        client: MockClient((r) async {
+          if (r.url.path.endsWith('/login')) {
+            return http.Response(jsonEncode(tokens()), 200);
+          }
+          if (r.url.path.endsWith('/me')) {
+            started.complete();
+            return response.future;
+          }
+          return http.Response('{}', 200);
+        }),
+      );
+      await service.login('rider@example.test', 'test-password-123');
+      final pending = service.request('GET', '/api/v1/me');
+      await started.future;
+      await service.logout();
+      response.complete(http.Response('{"id":"rider"}', 200));
+      await expectLater(pending, throwsA(isA<AccountFailure>()));
+      expect(service.state, AccountState.signedOut);
+      expect(service.user, isNull);
+    },
+  );
+  testWidgets('an unfinished ride cannot be assigned to a different login', (
+    tester,
+  ) async {
+    final db = BikeComputerDatabase(executor: NativeDatabase.memory());
+    Runtime.configure(db);
+    await db.putDocument(
+      'active',
+      'ride',
+      SessionCodec.encode(
+        RideSession(
+          state: RideState.recording,
+          startTime: DateTime(2026, 11, 1),
+        ),
+      ),
+    );
+    await tester.pumpWidget(const MaterialApp(home: AccountScreen()));
+    await tester.enterText(
+      find.byKey(const ValueKey('account-email')),
+      'rider@example.test',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('account-password')),
+      'test-password-123',
+    );
+    await tester.tap(find.byKey(const ValueKey('account-submit')));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Bewaar eerst je lopende rit of training voordat je van account wisselt.',
+      ),
+      findsOneWidget,
+    );
+    expect(Runtime.accounts.user, isNull);
+    await tester.pumpWidget(const SizedBox());
+    Runtime.configure(BikeComputerDatabase(executor: NativeDatabase.memory()));
+    await db.close();
+  });
+  test(
+    'legacy sessions retain their restored identity for the next offline open',
+    () async {
+      final store = Tokens();
+      final legacy = tokens()..remove('user');
+      store.values['velo-backend'] = 'https://velo.example.test';
+      store.values['velo-session'] = jsonEncode(legacy);
+      final first = AccountService(
+        baseUrl: 'https://velo.example.test',
+        store: store,
+        client: MockClient(
+          (_) async =>
+              http.Response('{"id":"rider","email":"rider@example.test"}', 200),
+        ),
+      );
+      await first.restore();
+      final offline = AccountService(
+        baseUrl: 'https://velo.example.test',
+        store: store,
+        client: MockClient((_) async => throw http.ClientException('offline')),
+      );
+      await offline.restore();
+      expect(offline.user?['id'], 'rider');
+      expect(offline.state, AccountState.unavailable);
+    },
+  );
   test(
     'login stores session, restores after restart and revokes logout',
     () async {
@@ -141,12 +242,19 @@ void main() {
       ),
     );
     await service.restore();
-    await tester.pumpWidget(
-      MaterialApp(
-        home: AccountGate(
-          account: service,
-          child: const Scaffold(body: Text('Klaar om te fietsen')),
+    final testRouter = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (_, __) => const Scaffold(body: Text('Klaar om te fietsen')),
         ),
+      ],
+    );
+    await tester.pumpWidget(
+      MaterialApp.router(
+        routerConfig: testRouter,
+        builder: (context, child) =>
+            AccountGate(account: service, child: child!),
       ),
     );
     expect(find.text('Inloggen'), findsOneWidget);
@@ -158,10 +266,14 @@ void main() {
       find.byKey(const ValueKey('account-password')),
       'test-password-123',
     );
+    await tester.pump();
+    expect(tester.takeException(), isNull);
     await tester.tap(find.byKey(const ValueKey('account-submit')));
     await tester.pumpAndSettle();
     expect(find.text('Klaar om te fietsen'), findsOneWidget);
     expect(service.state, AccountState.signedIn);
+    await tester.pumpWidget(const SizedBox());
+    testRouter.dispose();
   });
 
   testWidgets('local bike computer remains accessible without signing in', (

@@ -14,6 +14,7 @@ class SyncServer {
   final documents = <String, Map<String, dynamic>>{};
   int revision = 0, writes = 0;
   bool offline = false, revoked = false;
+  Future<void> Function()? beforeData;
   http.Client client() => MockClient((request) async {
     if (offline) throw http.ClientException('offline');
     http.Response reply(int code, dynamic body) =>
@@ -43,6 +44,9 @@ class SyncServer {
     if (parts.length < 4 || parts[2] != 'data') return reply(404, {});
     final kind = parts[3];
     if (request.method == 'GET') {
+      final hook = beforeData;
+      beforeData = null;
+      if (hook != null) await hook();
       final after =
           int.tryParse(request.url.queryParameters['after'] ?? '0') ?? 0;
       final rows =
@@ -125,6 +129,48 @@ class Device {
 }
 
 void main() {
+  test('a stale background sync cannot restore the previous account after a foreground switch', () async {
+    final server = SyncServer();
+    final foreground = Device(server);
+    final backgroundAccount = AccountService(
+      baseUrl: 'https://velo.example.test',
+      store: Tokens(),
+      client: server.client(),
+    );
+    final background = AccountSync(foreground.db, backgroundAccount);
+    try {
+      await foreground.login();
+      await foreground.db.putDocument(
+        'settings',
+        'app',
+        '{"theme":"alice-only"}',
+      );
+      await foreground.sync.run();
+      await backgroundAccount.login('alice@example.test', 'test-password-123');
+      server.beforeData = () async {
+        await foreground.account.logout();
+        await foreground.login('bob');
+        await foreground.db.putDocument(
+          'settings',
+          'app',
+          '{"theme":"bob-only"}',
+        );
+      };
+      await background.run();
+      expect(
+        jsonDecode(
+          (await foreground.db.getDocument('settings', 'app'))!,
+        )['theme'],
+        'bob-only',
+      );
+      expect(await foreground.db.documents('account-conflict'), isEmpty);
+      expect(server.writes, 1);
+    } finally {
+      background.dispose();
+      backgroundAccount.dispose();
+      await foreground.close();
+    }
+  });
   test('a server echo does not replace a newer unsent local edit', () async {
     final server = SyncServer();
     final a = Device(server);

@@ -6,6 +6,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:bike_computer/main.dart' as app;
 import 'package:bike_computer/core/runtime.dart';
 import 'package:bike_computer/services/accounts/account_service.dart';
+import 'package:bike_computer/features/accounts/account_screen.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -56,7 +57,16 @@ void main() {
       expect(restored.user?['email'], email);
       restored.dispose();
       await openAccount();
-      await tester.ensureVisible(find.text('Uitloggen'));
+      await tester.scrollUntilVisible(
+        find.text('Uitloggen'),
+        250,
+        scrollable: find
+            .descendant(
+              of: find.byType(AccountScreen),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
       await tester.tap(find.text('Uitloggen'));
       await until(find.byKey(const ValueKey('account-email')));
       await tester.enterText(

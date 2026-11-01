@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
@@ -148,7 +149,6 @@ class AccountSync extends ChangeNotifier {
       }
       await database.putDocument(category, id, raw);
     }
-    if (category == 'settings') await onSettingsChanged?.call();
   }
 
   Future<void> _preserve(
@@ -180,6 +180,7 @@ class AccountSync extends ChangeNotifier {
       throw AccountFailure('Deze versie hoort bij een ander account.');
     }
     await _apply(saved['category'], saved['id'], saved['raw']);
+    if (saved['category'] == 'settings') await onSettingsChanged?.call();
     await database.removeDocument('account-conflict', key);
     schedule();
   }
@@ -236,6 +237,11 @@ class AccountSync extends ChangeNotifier {
         } else {
           await database.removeDocument('account-owner', 'current');
         }
+        await database.putDocument(
+          'account-owner',
+          'generation',
+          '${DateTime.now().microsecondsSinceEpoch}-${Random.secure().nextInt(1 << 32)}',
+        );
       });
       await onSettingsChanged?.call();
     } finally {
@@ -271,8 +277,17 @@ class AccountSync extends ChangeNotifier {
     final owner = accounts.user?['id'] as String?;
     if (owner == null || _disposed) return;
     final epoch = _epoch;
-    bool current() =>
-        !_disposed && epoch == _epoch && accounts.user?['id'] == owner;
+    final ownerGeneration = await database.getDocument(
+      'account-owner',
+      'generation',
+    );
+    Future<bool> current() async =>
+        !_disposed &&
+        epoch == _epoch &&
+        accounts.user?['id'] == owner &&
+        (await database.getDocument('account-owner', 'current')) == owner &&
+        (await database.getDocument('account-owner', 'generation')) ==
+            ownerGeneration;
     if (await database.getDocument('account-owner', 'current') != owner) return;
     _applying = true;
     try {
@@ -292,47 +307,55 @@ class AccountSync extends ChangeNotifier {
               'GET',
               '/api/v1/data/$kind?after=$cursor&include_deleted=true',
             );
-            if (!current()) return;
+            if (!await current()) return;
             for (final change in page['items'] as List) {
-              if (!current()) return;
-              final id = change['id'] as String;
-              final stored = await database.getDocument(category, id);
-              final local = stored == null
-                  ? null
-                  : _portable(category, id, stored);
-              final meta = await _meta(owner, category, id);
-              final incoming = change['deleted'] == true
-                  ? null
-                  : jsonEncode(
-                      category == 'profiles'
-                          ? change['payload']['value']
-                          : change['payload'],
-                    );
-              final dirty =
-                  local != null &&
-                  (meta['hash'] == null || _fingerprint(local) != meta['hash']);
-              // The server may echo our last upload after an empty initial pull.
-              // This is still the common base, not a concurrent remote change.
-              if (meta['revision'] == change['revision'] && dirty) continue;
-              if (dirty &&
-                  (incoming == null ||
-                      _fingerprint(local) != _fingerprint(incoming))) {
-                await _preserve(owner, category, id, local);
-              }
-              // A local deletion remains pending when the server version has not changed.
-              if (local == null &&
-                  meta['deleted'] == false &&
-                  meta['revision'] == change['revision']) {
-                continue;
-              }
-              await _apply(category, id, incoming);
-              await _remember(
-                owner,
-                category,
-                id,
-                change['revision'],
-                incoming,
-              );
+              final applied = await database.transaction(() async {
+                if (!await current()) return false;
+                final id = change['id'] as String;
+                final stored = await database.getDocument(category, id);
+                final local = stored == null
+                    ? null
+                    : _portable(category, id, stored);
+                final meta = await _meta(owner, category, id);
+                final incoming = change['deleted'] == true
+                    ? null
+                    : jsonEncode(
+                        category == 'profiles'
+                            ? change['payload']['value']
+                            : change['payload'],
+                      );
+                final dirty =
+                    local != null &&
+                    (meta['hash'] == null ||
+                        _fingerprint(local) != meta['hash']);
+                // The server may echo our last upload after an empty initial pull.
+                // This is still the common base, not a concurrent remote change.
+                if (meta['revision'] == change['revision'] && dirty) {
+                  return true;
+                }
+                if (dirty &&
+                    (incoming == null ||
+                        _fingerprint(local) != _fingerprint(incoming))) {
+                  await _preserve(owner, category, id, local);
+                }
+                // A local deletion remains pending when the server version has not changed.
+                if (local == null &&
+                    meta['deleted'] == false &&
+                    meta['revision'] == change['revision']) {
+                  return true;
+                }
+                await _apply(category, id, incoming);
+                await _remember(
+                  owner,
+                  category,
+                  id,
+                  change['revision'],
+                  incoming,
+                );
+                return true;
+              });
+              if (!applied) return;
+              if (category == 'settings') await onSettingsChanged?.call();
             }
             cursor = page['cursor'] as int;
             more = page['has_more'] == true;
@@ -341,10 +364,14 @@ class AccountSync extends ChangeNotifier {
               cursorKey,
               '$cursor',
             );
-          } while (more && current());
-          final local = await database.documents(category);
+          } while (more && await current());
+          final local = await database.transaction(() async {
+            if (!await current()) return null;
+            return database.documents(category);
+          });
+          if (local == null) return;
           for (final item in local.entries) {
-            if (!current()) return;
+            if (!await current()) return;
             final source = await database.getDocument('route-source', item.key);
             if (item.key.startsWith('strava:') ||
                 await database.getDocument('activity-source', item.key) !=
@@ -367,7 +394,7 @@ class AccountSync extends ChangeNotifier {
                   'expected_revision': meta['revision'],
               },
             );
-            if (!current()) return;
+            if (!await current()) return;
             await _remember(
               owner,
               category,
@@ -387,12 +414,12 @@ class AccountSync extends ChangeNotifier {
             }
             final meta = jsonDecode(item.value);
             if (meta['deleted'] == true) continue;
-            if (!current()) return;
+            if (!await current()) return;
             final result = await accounts.request(
               'DELETE',
               '/api/v1/data/$kind/${Uri.encodeComponent(parts[2])}?expected_revision=${meta['revision']}',
             );
-            if (!current()) return;
+            if (!await current()) return;
             if (result['revision'] != null) {
               await _remember(
                 owner,

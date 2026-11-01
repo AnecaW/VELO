@@ -42,6 +42,7 @@ class AccountService extends ChangeNotifier {
            .replaceAll(RegExp(r'/+$'), '');
   final String base;
   static const _lanBuild = bool.fromEnvironment('VELO_LAN_MODE');
+  bool get localNetworkOnly => _lanBuild;
   static bool _privateAddress(String host) {
     final address = InternetAddress.tryParse(host);
     if (address == null || address.rawAddress.length != 4) return false;
@@ -57,6 +58,7 @@ class AccountService extends ChangeNotifier {
   String? message;
   Map<String, dynamic>? _tokens;
   Future<void>? _refreshing;
+  int _authGeneration = 0;
   void _state(AccountState value, [String? text]) {
     state = value;
     message = text;
@@ -79,8 +81,13 @@ class AccountService extends ChangeNotifier {
         user = Map<String, dynamic>.from(_tokens!['user']);
       }
       if (user != null) await onIdentityChange?.call(user?['id'] as String?);
-      user = await request('GET', '/api/v1/me') as Map<String, dynamic>;
-      await onIdentityChange?.call(user?['id'] as String?);
+      final restoredUser =
+          await request('GET', '/api/v1/me') as Map<String, dynamic>;
+      await onIdentityChange?.call(restoredUser['id'] as String?);
+      user = restoredUser;
+      _tokens!['user'] = restoredUser;
+      await store.write('velo-session', jsonEncode(_tokens));
+      await store.write('velo-session-origin', base);
       _state(AccountState.signedIn);
     } catch (_) {
       /* request preserves offline credentials */
@@ -171,6 +178,7 @@ class AccountService extends ChangeNotifier {
       };
       await store.write('velo-session', jsonEncode(_tokens));
     } on _Unauthorized {
+      _authGeneration++;
       await onIdentityChange?.call(null);
       _tokens = null;
       user = null;
@@ -186,6 +194,16 @@ class AccountService extends ChangeNotifier {
     Object? body,
     bool authenticated = true,
   }) async {
+    final generation = _authGeneration;
+    void checkGeneration() {
+      if (generation != _authGeneration) {
+        throw AccountFailure(
+          'Je aanmelding is gewijzigd. Probeer opnieuw.',
+          code: 'session_changed',
+        );
+      }
+    }
+
     try {
       if (authenticated && _tokens == null) {
         throw AccountFailure('Meld je eerst aan bij VELO.');
@@ -196,6 +214,7 @@ class AccountService extends ChangeNotifier {
         await (_refreshing ??= _refresh().whenComplete(
           () => _refreshing = null,
         ));
+        checkGeneration();
       }
       try {
         final value = await _send(
@@ -204,9 +223,11 @@ class AccountService extends ChangeNotifier {
           body,
           authenticated ? (_tokens!['access_token'] as String) : null,
         );
+        checkGeneration();
         if (authenticated) _state(AccountState.signedIn);
         return value;
       } on _Unauthorized {
+        checkGeneration();
         if (!authenticated) {
           _state(
             AccountState.authenticationError,
@@ -217,8 +238,16 @@ class AccountService extends ChangeNotifier {
         await (_refreshing ??= _refresh().whenComplete(
           () => _refreshing = null,
         ));
+        checkGeneration();
         try {
-          return await _send(method, path, body, _tokens?['access_token']);
+          final value = await _send(
+            method,
+            path,
+            body,
+            _tokens?['access_token'],
+          );
+          checkGeneration();
+          return value;
         } on _Unauthorized {
           _state(AccountState.expired, 'Sessie verlopen. Meld opnieuw aan.');
           throw AccountFailure(message!);
@@ -227,9 +256,12 @@ class AccountService extends ChangeNotifier {
     } on AccountFailure {
       rethrow;
     } catch (_) {
+      checkGeneration();
       _state(
         AccountState.unavailable,
-        'VELO is tijdelijk niet bereikbaar. Je fietscomputer blijft werken. Probeer later opnieuw.',
+        _lanBuild
+            ? 'Geen verbinding met VELO. Controleer of je met je thuisnetwerk bent verbonden. Je fietscomputer blijft werken.'
+            : 'VELO is tijdelijk niet bereikbaar. Je fietscomputer blijft werken. Probeer later opnieuw.',
       );
       throw AccountFailure(message!);
     }
@@ -251,6 +283,7 @@ class AccountService extends ChangeNotifier {
     String password, {
     bool register = false,
   }) async {
+    _authGeneration++;
     _state(AccountState.signingIn);
     try {
       _tokens = Map<String, dynamic>.from(
@@ -281,6 +314,7 @@ class AccountService extends ChangeNotifier {
   }
 
   Future<void> _logout() async {
+    _authGeneration++;
     final refresh = _tokens?['refresh_token'];
     if (refresh != null) {
       // Retain credentials when revocation cannot be confirmed; let the user retry.
@@ -304,6 +338,7 @@ class AccountService extends ChangeNotifier {
   }
 
   Future<void> _deleted() async {
+    _authGeneration++;
     await onIdentityChange?.call(null);
     _tokens = null;
     user = null;

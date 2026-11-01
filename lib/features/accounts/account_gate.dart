@@ -13,6 +13,7 @@ class AccountGate extends StatefulWidget {
 }
 
 class _AccountGateState extends State<AccountGate> {
+  final _welcomeNavigator = GlobalKey<NavigatorState>();
   bool offline = false;
   bool admitted = false;
   @override
@@ -31,9 +32,20 @@ class _AccountGateState extends State<AccountGate> {
           (admitted && widget.account.state == AccountState.expired)) {
         return widget.child;
       }
-      return AccountScreen(
-        account: widget.account,
-        onContinueOffline: () => setState(() => offline = true),
+      // MaterialApp.router's builder sits above its Router/Navigator. A separate
+      // welcome navigator provides the Overlay needed by native text selection.
+      return Navigator(
+        key: _welcomeNavigator,
+        onGenerateRoute: (settings) => MaterialPageRoute<void>(
+          settings: settings,
+          builder: (_) => AccountScreen(
+            account: widget.account,
+            onContinueOffline: () {
+              FocusManager.instance.primaryFocus?.unfocus();
+              setState(() => offline = true);
+            },
+          ),
+        ),
       );
     },
   );
