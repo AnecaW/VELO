@@ -89,3 +89,19 @@ def test_release_manifest_rejects_foreign_image(tmp_path,monkeypatch):
     payloads=iter([releases,{'source_commit':'a'*40,'image':'ghcr.io/foreign/velo-backend@sha256:'+'a'*64}])
     monkeypatch.setattr('velo_backend.updater.urllib.request.urlopen',lambda *args,**kwargs:io.BytesIO(json.dumps(next(payloads)).encode()))
     with pytest.raises(ValueError,match='image repository'):latest_release(settings(tmp_path))
+
+
+def test_release_selection_uses_publication_time_not_api_array_order(tmp_path,monkeypatch):
+    releases=[]
+    for letter,hour in [('a','12'),('b','13')]:
+        tag='backend-'+letter*40
+        releases.append({'tag_name':tag,'published_at':f'2026-11-01T{hour}:00:00Z','assets':[{'name':'velo-backend-release.json','browser_download_url':f'https://github.com/AnecaW/VELO/releases/download/{tag}/velo-backend-release.json'}]})
+    calls=[]
+    def open_url(request,**kwargs):
+        url=request.full_url if hasattr(request,'full_url') else request
+        calls.append(url)
+        return io.BytesIO(json.dumps(releases if len(calls)==1 else {'source_commit':'b'*40,'image':NEW}).encode())
+    monkeypatch.setattr('velo_backend.updater.urllib.request.urlopen',open_url)
+    candidate=latest_release(settings(tmp_path))
+    assert candidate['reference']=='refs/tags/backend-'+'b'*40
+    assert 'backend-'+'b'*40 in calls[1]

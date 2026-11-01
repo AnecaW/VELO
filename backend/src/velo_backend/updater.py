@@ -73,7 +73,9 @@ class Portainer:
 def latest_release(settings):
     request=urllib.request.Request(f'https://api.github.com/repos/{settings.repository}/releases?per_page=20',headers={'Accept':'application/vnd.github+json','User-Agent':'VELO-self-hosted-updater'})
     with urllib.request.urlopen(request,timeout=20) as response:releases=json.load(response)
-    for release in releases:
+    # API result order is not a release-order guarantee (for example after tag
+    # publication races). Never select an older manifest just because it is first.
+    for release in sorted(releases,key=lambda r:r.get('published_at') or r.get('created_at') or '',reverse=True):
         if release.get('draft') or release.get('prerelease'):continue
         tag=release.get('tag_name','')
         if not re.fullmatch(r'backend-[0-9a-f]{40}',tag):continue

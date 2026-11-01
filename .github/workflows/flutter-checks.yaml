@@ -1,7 +1,14 @@
 name: Flutter checks
-on: [push, pull_request]
+on:
+  push:
+    paths: ['lib/**', 'android/**', 'assets/**', 'test/**', 'integration_test/**', 'config/**', 'pubspec.*', '.github/workflows/flutter-checks.yaml']
+  pull_request:
+    paths: ['lib/**', 'android/**', 'assets/**', 'test/**', 'integration_test/**', 'config/**', 'pubspec.*', '.github/workflows/flutter-checks.yaml']
 permissions:
   contents: read
+concurrency:
+  group: flutter-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   flutter:
     runs-on: ubuntu-latest
