@@ -30,6 +30,7 @@ def setup(tmp_path):
             body=parse_qs(request.content.decode())
             assert body['client_secret']==['test-secret-not-production']
             if body['grant_type']==['refresh_token']:
+                if mode['refresh']:return httpx.Response(400,json={'message':'revoked'})
                 return httpx.Response(200,json={'access_token':'rotated-access','refresh_token':'rotated-refresh','expires_at':int(time.time())+3600})
             id=202 if body.get('code')==['second'] else 101
             return httpx.Response(200,json={'access_token':f'test-access-{id}','refresh_token':f'test-refresh-{id}','expires_at':int(time.time())+3600,'athlete':{'id':id,'firstname':'Not stored'}})
@@ -189,6 +190,30 @@ def test_refresh_rotation_is_server_only(setup):
     with db.connect(True) as con:con.execute("UPDATE connections SET tokens=?",(db.seal({'access_token':'expired','refresh_token':'old','expires_at':1}),))
     assert provider.token(user)=='rotated-access'
     assert 'rotated' not in client.get('/api/v1/integrations/strava').text
+
+
+def test_revoked_provider_refresh_clears_tokens_and_cache(setup):
+    client,db,provider,_,mode,_=setup
+    grant(client);Worker(db,provider).tick()
+    user=client.get('/api/v1/me').json()['id']
+    with db.connect(True) as con:con.execute('UPDATE connections SET tokens=?',(db.seal({'access_token':'expired','refresh_token':'revoked','expires_at':1}),))
+    mode['refresh']=True
+    with pytest.raises(ProviderError):provider.token(user)
+    with db.connect() as con:
+        row=con.execute('SELECT status,tokens FROM connections').fetchone()
+        assert row['status']=='needs_reconnect' and db.open(row['tokens'])=={}
+        assert con.execute('SELECT COUNT(*) FROM cache').fetchone()[0]==0
+
+
+def test_expired_oauth_state_and_job_list_isolation(setup):
+    client,db,*_=setup
+    second=other(client)
+    proof=connect(client)
+    with db.connect(True) as con:con.execute('UPDATE oauth_states SET expires_at=0')
+    assert client.post('/api/v1/integrations/strava/confirm',json=proof).status_code==400
+    grant(client)
+    assert client.get('/api/v1/jobs').json()
+    assert client.get('/api/v1/jobs',headers=second).json()==[]
 
 def test_upload_requires_optin_and_is_idempotent(setup):
     client,db,provider,calls,*_=setup;grant(client);client.put('/api/v1/data/rides/ride-test',json={'payload':ride()})

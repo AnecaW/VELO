@@ -15,29 +15,66 @@ class BackendStravaService extends StravaService {
   Future<void> refreshStatus() async {
     if (accounts.user == null) return;
     final info = await accounts.request('GET', '/api/v1/integrations/strava');
-    if (info['status'] == 'needs_reconnect') await StravaCache(database).expire(all: true);
+    if (info['status'] == 'needs_reconnect') {
+      await StravaCache(database).expire(all: true);
+    }
     await SyncRepository(database).update('strava', {
-      'status': info['connected'] == true ? 'Verbonden' : info['status'] == 'needs_reconnect' ? 'Opnieuw verbinden' : 'Niet verbonden',
+      'status': info['connected'] == true
+          ? 'Verbonden'
+          : info['status'] == 'needs_reconnect'
+          ? 'Opnieuw verbinden'
+          : 'Niet verbonden',
       'error': info['error'],
-      if (info['last_sync'] != null) 'lastSuccess': DateTime.fromMillisecondsSinceEpoch((info['last_sync'] as int)*1000,isUtc:true).toIso8601String(),
+      if (info['last_sync'] != null)
+        'lastSuccess': DateTime.fromMillisecondsSinceEpoch(
+          (info['last_sync'] as int) * 1000,
+          isUtc: true,
+        ).toIso8601String(),
     });
     final jobs = await accounts.request('GET', '/api/v1/jobs') as List;
     for (final job in jobs.where((j) => j['kind'] == 'upload')) {
-      await database.putDocument('sync',job['job_key'],jsonEncode({
-        'status': job['status'], 'attempts':job['attempts'],'error':job['error'],
-        'next': (job['next_at'] as int)*1000,
-        if(job['result']?['activity_id'] != null) 'activity_id':job['result']['activity_id'],
-      }));
+      await database.putDocument(
+        'sync',
+        job['job_key'],
+        jsonEncode({
+          'status': job['status'],
+          'attempts': job['attempts'],
+          'error': job['error'],
+          'next': (job['next_at'] as int) * 1000,
+          if (job['result']?['activity_id'] != null)
+            'activity_id': job['result']['activity_id'],
+        }),
+      );
     }
-    final history = await accounts.request('GET','/api/v1/sync/history') as List;
-    var index=0;
-    for(final row in history) {
-      await database.putDocument('sync-history','server-${row['created_at']}-${index++}',jsonEncode({
-        'provider':row['provider'],'date':DateTime.fromMillisecondsSinceEpoch((row['created_at'] as int)*1000,isUtc:true).toIso8601String(),
-        'trigger':'server','status':row['status'],'message':row['message'],
-      }));
+    final history =
+        await accounts.request('GET', '/api/v1/sync/history') as List;
+    final expectedKeys = history
+        .map((row) => 'server-${sha256.convert(utf8.encode(jsonEncode(row)))}')
+        .toSet();
+    for (final key in (await database.documents('sync-history')).keys) {
+      if (key.startsWith('server-') && !expectedKeys.contains(key)) {
+        await database.removeDocument('sync-history', key);
+      }
+    }
+    for (final row in history) {
+      final key = 'server-${sha256.convert(utf8.encode(jsonEncode(row)))}';
+      await database.putDocument(
+        'sync-history',
+        key,
+        jsonEncode({
+          'provider': row['provider'],
+          'date': DateTime.fromMillisecondsSinceEpoch(
+            (row['created_at'] as int) * 1000,
+            isUtc: true,
+          ).toIso8601String(),
+          'trigger': 'server',
+          'status': row['status'],
+          'message': row['message'],
+        }),
+      );
     }
   }
+
   @override
   Future<Map<String, dynamic>?> account() async {
     if (accounts.user == null) return null;

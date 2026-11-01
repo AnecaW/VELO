@@ -122,6 +122,7 @@ class AccountService extends ChangeNotifier {
       _tokens = Map<String, dynamic>.from(next);
       await store.write('velo-session', jsonEncode(_tokens));
     } on _Unauthorized {
+      await onIdentityChange?.call();
       _tokens = null;
       user = null;
       await store.write('velo-session', null);
