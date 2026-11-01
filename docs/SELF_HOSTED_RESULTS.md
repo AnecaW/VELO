@@ -22,7 +22,7 @@ Uitgevoerd op 1 november 2026. De bestaande Flutter-app staat behouden in de pro
 - Registratie, login, eigen account en refresh via echte HTTP-verzoeken tegen de container getest. CLI-beheerinstallatie getest met uitsluitend gegenereerde testcredentials. Twee testaccounts en schema 3 bleven na opnieuw aanmaken van de containers behouden.
 - GitHub backendchecks en imagepublicatie geslaagd. Gepubliceerde image zonder registrycredentials opgehaald:
   `ghcr.io/anecaw/velo-backend@sha256:17a049230e128dc9751e45431938be815025795bc0dce7888d86e03c4c1caa2f`.
-- De eerste Flutter-CI-run vond de lege iconenmap die Git niet had meegenomen. De map wordt inmiddels met een README bewaard; de nieuwe CI-run is via GitHub Actions te volgen.
+- GitHub Flutter-CI is nu ook volledig geslaagd: analyse, tests en debug-APK-build op Linux met JDK 21. Run: https://github.com/AnecaW/VELO/actions/runs/41301644118. De eerdere ontbrekende iconenmap en Java-versie zijn hersteld.
 - Voor commit/push zijn de index en geheimenpatronen gecontroleerd. De enige gevonden lange wachtwoord/secret-literals waren expliciete backendtestwaarden. Productie-env, databases, GPS-bestanden, back-ups, APK's, signingkeys en lokale logs zijn uitgesloten. De remote had bij aanvang geen commits om op oudere secrets te controleren.
 
 ## Werkelijk gedeployed op de homelabserver
@@ -39,7 +39,7 @@ De stack gebruikt `deployment/compose.portainer-restricted.yaml` uit dezelfde Gi
 - Eerste beheerder via het CLI-installatieproces aangemaakt met het door de gebruiker opgegeven e-mailadres en een willekeurig gegenereerd wachtwoord. Dat wachtwoord is uitsluitend opgeslagen in `C:\Users\wanne\.codex\secrets\velo-admin-initial.txt`; de productie-encryptiesleutel en variabelen staan uitsluitend buiten Git in `C:\Users\wanne\.codex\secrets\velo-production.env`. Beide bestanden hebben toegangsrechten voor de huidige Windows-gebruiker.
 - Echte LAN-verzoeken getest voor registratie, login, fout wachtwoord, gegevensisolatie, refresh-rotatie, uitloggen, intrekking en ontbrekende SMTP/Strava-configuratie. De twee wegwerpaccounts en hun testgegevens zijn nadien verwijderd.
 - Alle drie containers herstart. Daarna beheerderlogin, schema 3 en persistentie gecontroleerd. Alleen het beheerdersaccount bleef aanwezig.
-- Een versleutelde back-up na installatie is daadwerkelijk aangemaakt: `/backups/velo-after-install.velobackup`, 224382 bytes. Dagelijkse back-ups staan daarnaast aan.
+- Een versleutelde back-up na installatie is daadwerkelijk aangemaakt: `/backups/velo-after-install.velobackup`, 224382 bytes. Die echte back-up is succesvol hersteld in een geisoleerde tijdelijke map, met controle van het beheerdersaccount en afwezigheid van sessies. De actieve database is niet vervangen. Dagelijkse back-ups staan daarnaast aan.
 
 Er is nog geen publieke HTTPS-origin ingericht. `VELO_PUBLIC_URL=https://velo.example.test` is voorlopig uitsluitend een configuratieplaceholder, geen werkende publieke URL. LAN-toegang via HTTP is bedoeld voor de debug-app. Releasegebruik en Strava-callbacks vereisen een geldig HTTPS-domein.
 
@@ -49,7 +49,7 @@ SMTP en e-mailverificatie blijven op expliciet verzoek ongeconfigureerd. Wachtwo
 
 ## Vervolgstappen voor de gebruiker
 
-1. Lees het tijdelijke beheerderswachtwoord uit het bovengenoemde lokale bestand. Stel in de debug-app via Meer > VELO-account het serveradres `http://192.168.0.150:8080` in en log in met het opgegeven e-mailadres. Wijzig het tijdelijke wachtwoord via de accountpagina.
+1. Installeer desgewenst de lokaal gebouwde LAN-debug-APK `dist/velo-lan-debug.apk`; daarin is uitsluitend de backend-URL via `--dart-define` ingesteld, zonder secrets. Lees het tijdelijke beheerderswachtwoord uit het bovengenoemde lokale bestand. Stel in de debug-app via Meer > VELO-account het serveradres `http://192.168.0.150:8080` in en log in met het opgegeven e-mailadres. Wijzig het tijdelijke wachtwoord via de accountpagina.
 2. Bewaar de productie-encryptiesleutel en back-ups ook op een tweede beveiligde locatie. Zonder de sleutel zijn de versleutelde gegevens en back-ups niet herstelbaar.
 3. Configureer een geldig HTTPS-domein met reverse proxy of tunnel, wijzig `VELO_PUBLIC_URL` in Portainer en herdeploy. Gebruik die HTTPS-URL in de release-app.
 4. Configureer desgewenst Strava Client ID, Client Secret en het geregistreerde callbackdomein. SMTP blijft uitgeschakeld tot je de SMTP-variabelen invult.
