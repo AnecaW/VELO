@@ -51,12 +51,12 @@ class _MoreScreenState extends State<MoreScreen> {
         .where((e) => e.$1.toLowerCase().contains(search.toLowerCase()))
         .toList();
     return Scaffold(
-      appBar: AppBar(title: const Text('Apps')),
+      appBar: AppBar(title: const Text('VELO-functies')),
       body: CustomScrollView(
         key: const ValueKey('more-list'),
         slivers: [
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             sliver: SliverToBoxAdapter(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

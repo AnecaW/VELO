@@ -57,10 +57,21 @@ def main():
         for slug in ('velo-api', 'velo-worker'):
             api.deploy(slug)
     elif args.command == 'configure-auth':
-        api.request('/config/auth', {'mailer_autoconfirm': True, 'external_email_enabled': True,
+        current = api.request('/config/auth')
+        missing = [k for k in ('smtp_host','smtp_port','smtp_user','smtp_pass','smtp_admin_email','smtp_sender_name') if not current.get(k)]
+        if missing: raise RuntimeError('Missing Supabase SMTP fields: '+', '.join(missing))
+        api.request('/config/auth', {'mailer_autoconfirm': False, 'external_email_enabled': True,
             'disable_signup': False, 'password_min_length': 12, 'jwt_exp': 900,
             'site_url': 'ultimatebike://auth/callback', 'uri_allow_list': 'ultimatebike://auth/callback'}, 'PATCH')
-        print('Email/password signup enabled; immediate login; password minimum 12; JWT 15 minutes.')
+        templates = {}
+        for key in ('mailer_templates_confirmation_content', 'mailer_templates_recovery_content'):
+            content = current.get(key) or '<p><a href="{{ .ConfirmationURL }}">Open VELO op je Android-toestel</a></p>'
+            if '.Token' not in content:
+                content += '<p>Lees je deze mail op een ander toestel? Vul deze code in VELO in: <strong>{{ .Token }}</strong></p><p>De link opent de Android-app. Deel je code met niemand.</p>'
+            templates[key] = content
+        api.request('/config/auth', templates, 'PATCH')
+        api.request('/secrets',[{'name':'VELO_PASSWORD_RESET_ENABLED','value':'true'}])
+        print('Email/password signup enabled; confirmation required; recovery enabled; SMTP credentials kept on Supabase.')
     else:
         existing = {row['version'] for row in api.request('/database/migrations')}
         for path in sorted((ROOT / 'supabase/migrations').glob('*.sql')):

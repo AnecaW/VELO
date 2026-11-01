@@ -1,4 +1,10 @@
 import 'package:bike_computer/features/profiles/profiles_screen.dart';
+
+import '../accounts/account_screen.dart';
+import 'data_settings_screen.dart';
+import '../../widgets/velo_ui.dart';
+import '../more/android_apps_screen.dart';
+
 import 'package:bike_computer/features/settings/appearance_screen.dart';
 import 'package:bike_computer/features/maps/map_settings_screen.dart';
 import 'package:bike_computer/features/training/training_screen.dart';
@@ -65,7 +71,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Close'),
+              child: const Text('Sluiten'),
             ),
           ],
         ),
@@ -126,378 +132,482 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Settings')),
-    body: ListView(
-      children: [
-        if (error != null)
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(error!, style: const TextStyle(color: Colors.orange)),
-          ),
-        _section(
-          'Activity Profiles',
-          Icons.directions_bike,
-          () => _page(const ProfilesScreen()),
-        ),
-        _section(
-          'Units',
-          Icons.straighten,
-          () => _dialog(
-            'Unit System',
-            (update) => [
-              RadioGroup<bool>(
-                groupValue: Runtime.settings.value('imperial', false),
-                onChanged: (v) async {
-                  await _set('imperial', v);
-                  update(() {});
-                },
-                child: const Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    RadioListTile<bool>(
-                      title: Text('Metric (km, km/h, m, °C)'),
-                      value: false,
-                    ),
-                    RadioListTile<bool>(
-                      title: Text('Imperial (mi, mph, ft, °F)'),
-                      value: true,
-                    ),
-                  ],
+    appBar: AppBar(title: const Text('Instellingen')),
+    body: SafeArea(
+      top: false,
+      child: ListView(
+        padding: VeloSpace.insets,
+        children: [
+          if (error != null) VeloNotice(error!, error: true),
+          VeloSection(
+            title: 'Account',
+            children: [
+              ListTile(
+                leading: const Icon(Icons.person_outline),
+                title: const Text('Accountgegevens'),
+                subtitle: Text(
+                  Runtime.accounts.user?['email'] ??
+                      'Aanmelden of een account aanmaken',
                 ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _page(const AccountScreen()),
               ),
             ],
           ),
-        ),
-        _section(
-          'OLED & uiterlijk',
-          Icons.palette_outlined,
-          () => _page(const AppearanceScreen()),
-        ),
-        _section(
-          'Kaartprovider & stijl',
-          Icons.layers_outlined,
-          () => _page(const MapSettingsScreen()),
-        ),
-        _section(
-          'Offline gebieden',
-          Icons.download_outlined,
-          () => _page(const OfflineMapsScreen()),
-        ),
-        _section(
-          'Trainingsprofiel & generator',
-          Icons.fitness_center,
-          () => _page(const TrainingScreen()),
-        ),
-        _section(
-          'Display',
-          Icons.brightness_4,
-          () => _dialog(
-            'Display Settings',
-            (update) => [
-              _switch(
-                'Direct fietsscherm bij opstarten',
-                'startRide',
-                false,
-                update,
+          VeloSection(
+            title: 'Weergave',
+            children: [
+              _section(
+                'OLED & uiterlijk',
+                Icons.palette_outlined,
+                () => _page(const AppearanceScreen()),
               ),
-
-              _switch('Scherm aan tijdens rit', 'keepOn', true, update),
-              const Text('Schermhelderheid tijdens rit'),
-              Slider(
-                value: Runtime.settings.value('brightness', 0.8),
-                min: 0.1,
-                max: 1,
-                onChanged: (v) async {
-                  await _set('brightness', v);
-                  await PlatformBridge.call('display', {
-                    'brightness': v,
-                    'keepOn': Runtime.settings.value('keepOn', true),
-                  });
-                  update(() {});
-                },
-              ),
-            ],
-          ),
-        ),
-        _section(
-          'Sensors',
-          Icons.bluetooth,
-          () => _page(const SensorsScreen()),
-        ),
-        _section(
-          'GPS & Recording',
-          Icons.gps_fixed,
-          () => _dialog(
-            'GPS & Recording',
-            (update) => [
-              _switch('Hoge GPS-nauwkeurigheid', 'highAccuracy', true, update),
-              _switch(
-                'Automatische pauze (<3 km/h, 5 s)',
-                'autoPause',
-                false,
-                update,
-              ),
-              const Text('GPS-interval · seconden (volgende rit)'),
-              Slider(
-                value: Runtime.settings.value('gpsInterval', 2).toDouble(),
-                min: 1,
-                max: 10,
-                divisions: 9,
-                label: '${Runtime.settings.value('gpsInterval', 2)} s',
-                onChanged: (v) async {
-                  await _set('gpsInterval', v.round());
-                  update(() {});
-                },
-              ),
-              const Text('Maximale horizontale GPS-fout'),
-              Slider(
-                value: Runtime.settings.value('maxAccuracy', 50.0),
-                min: 10,
-                max: 100,
-                divisions: 9,
-                label:
-                    '${Runtime.settings.value('maxAccuracy', 50.0).round()} m',
-                onChanged: (v) async {
-                  await _set('maxAccuracy', v);
-                  update(() {});
-                },
-              ),
-            ],
-          ),
-        ),
-        _section(
-          'Navigation',
-          Icons.near_me,
-          () => _dialog(
-            'Navigation Settings',
-            (update) => [
-              _switch(
-                'Online OpenStreetMap · deelt kaartgebied',
-                'onlineMap',
-                false,
-                update,
-              ),
-              _switch('Auto Re-route', 'reroute', false, update),
-              _switch('Voice Prompts', 'voice', false, update),
-              const Text('Routeringprofiel (provider ondersteund)'),
-              DropdownButton<String>(
-                value: Runtime.settings.value(
-                  'routingProfile',
-                  'cycling-regular',
-                ),
-                isExpanded: true,
-                items: [
-                  for (final p in [
-                    'cycling-regular',
-                    'cycling-road',
-                    'cycling-mountain',
-                    'cycling-electric',
-                  ])
-                    DropdownMenuItem(value: p, child: Text(p)),
-                ],
-                onChanged: (v) async {
-                  await _set('routingProfile', v);
-                  update(() {});
-                },
-              ),
-              const Text(
-                'GPX-begeleiding werkt offline. Voor nieuwe routes en herberekening heb je verbinding met VELO nodig.',
-              ),
-            ],
-          ),
-        ),
-        _section(
-          'Offline maps',
-          Icons.map,
-          () => _dialog(
-            'Offline kaarten',
-            (update) => [
-              Text(
-                Runtime.settings.value<String?>('offlineMap', null) == null
-                    ? 'Geen offline achtergrondkaart'
-                    : 'Raster MBTiles geïmporteerd. Controleer dekking en zoomniveaus vóór vertrek.',
-              ),
-              FilledButton(
-                onPressed: () async {
-                  await _offline();
-                  update(() {});
-                },
-                child: const Text('Importeer raster MBTiles'),
-              ),
-              TextButton(
-                onPressed: () async {
-                  final path = Runtime.settings.value<String?>(
-                    'offlineMap',
-                    null,
-                  );
-                  await _set('offlineMap', null);
-                  if (path != null && await File(path).exists()) {
-                    await File(path).delete();
-                  }
-                  update(() {});
-                },
-                child: const Text('Offline kaart verwijderen'),
-              ),
-              const Text(
-                'Gebruik uitsluitend kaarten waarvoor je offline gebruiksrechten hebt. Geen bulkdownload van openbare OSM-tiles.',
-              ),
-            ],
-          ),
-        ),
-        _section(
-          'Integrations',
-          Icons.sync,
-          () => _dialog(
-            'Integrations',
-            (update) => [
-              FilledButton(
-                onPressed: () => _page(const IntegrationsScreen()),
-                child: const Text('Verbonden apps · Privacy & Synchronisatie'),
-              ),
-              const Text(
-                'Koppel je favoriete apps en kies welke gegevens je wilt delen.',
-              ),
-            ],
-          ),
-        ),
-        _section(
-          'Training · FTP',
-          Icons.fitness_center,
-          () => _dialog(
-            'Trainingzones',
-            (update) => [
-              Text(
-                'FTP: ${Runtime.settings.value('ftp', 0.0) == 0 ? 'niet ingesteld' : Runtime.settings.value('ftp', 0.0).round()} W',
-              ),
-              Slider(
-                value: Runtime.settings.value('ftp', 50.0).clamp(50.0, 600.0),
-                min: 50,
-                max: 600,
-                divisions: 110,
-                onChanged: (v) async {
-                  await _set('ftp', v);
-                  update(() {});
-                },
-              ),
-              const Text(
-                'Vermogenszones: ≤55%, ≤75%, ≤90%, ≤105%, ≤120%, ≤150%, >150% van FTP. Stel je eigen gemeten FTP in vóór een training.',
-              ),
-            ],
-          ),
-        ),
-        _section(
-          'Voeding & hydratatie',
-          Icons.water_drop_outlined,
-          () => _dialog(
-            'Herinneringen',
-            (update) => [
-              for (final pair in [
-                ('drinkMinutes', 'Drinken'),
-                ('foodMinutes', 'Voeding'),
-              ])
-                Column(
-                  children: [
-                    Text(
-                      '${pair.$2}: ${Runtime.settings.value(pair.$1, 0)} min (0 = uit)',
+              _section(
+                'Scherminstellingen',
+                Icons.brightness_4,
+                () => _dialog(
+                  'Scherminstellingen',
+                  (update) => [
+                    _switch('Scherm aan tijdens rit', 'keepOn', true, update),
+                    const Text(
+                      'Scherm vastzetten gebruikt de Android-bevestiging. Ontgrendel via de systeemtoetsen van je toestel.',
                     ),
+                    TextButton.icon(
+                      onPressed: () async {
+                        try {
+                          await PlatformBridge.call('pin');
+                        } catch (_) {
+                          if (mounted) {
+                            setState(
+                              () => error = 'Vastzetten is niet beschikbaar op dit toestel.',
+                            );
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.push_pin_outlined),
+                      label: const Text('VELO vastzetten'),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        await PlatformBridge.call('unpin');
+                      },
+                      child: const Text('Vastzetten stoppen'),
+                    ),
+                    const Text('Schermhelderheid tijdens rit'),
                     Slider(
-                      value: Runtime.settings.value(pair.$1, 0).toDouble(),
-                      min: 0,
-                      max: 120,
-                      divisions: 24,
+                      value: Runtime.settings.value('brightness', 0.8),
+                      min: 0.1,
+                      max: 1,
                       onChanged: (v) async {
-                        await _set(pair.$1, v.round());
+                        await _set('brightness', v);
+                        await PlatformBridge.call('display', {
+                          'brightness': v,
+                          'keepOn': Runtime.settings.value('keepOn', true),
+                        });
                         update(() {});
                       },
                     ),
                   ],
                 ),
-            ],
-          ),
-        ),
-        _section('Telefoon-apps', Icons.apps, () => _page(const AppsScreen())),
-        _section(
-          'Back-up & herstellen',
-          Icons.backup,
-          () => _dialog(
-            'Gegevensbeheer',
-            (update) => [
-              const Text(
-                'Een back-up bevat persoonlijke GPS-sporen, routes en instellingen. Je aanmeldgegevens worden niet meegenomen. Bewaar het bestand zelf veilig.',
-              ),
-              FilledButton(
-                onPressed: () async {
-                  try {
-                    final data = await BackupService(Runtime.database).export();
-                    await FilePicker.saveFile(
-                      fileName: 'bike-backup.json',
-                      mimeType: 'application/json',
-                      bytes: Uint8List.fromList(utf8.encode(data)),
-                    );
-                  } catch (e) {
-                    if (mounted) setState(() => error = e.toString());
-                  }
-                },
-                child: const Text('Back-up exporteren'),
-              ),
-              OutlinedButton(
-                onPressed: () async {
-                  try {
-                    final files = await FilePicker.pickFiles(
-                      type: FileType.any,
-                    );
-                    if (files.isEmpty) return;
-                    final length = await files.first.length();
-                    if (length == null || length > 50 * 1024 * 1024) {
-                      throw StateError('Maximaal 50 MB');
-                    }
-                    await BackupService(Runtime.database)
-                        .restore(utf8.decode(await files.first.readAsBytes()));
-                    await Runtime.settings.load();
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Back-up hersteld; bestaande ritten behouden',
-                          ),
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    if (mounted) setState(() => error = e.toString());
-                  }
-                },
-                child: const Text('Back-up importeren'),
               ),
             ],
           ),
-        ),
-        _section(
-          'Diagnostics',
-          Icons.monitor_heart_outlined,
-          () => _page(const DiagnosticsScreen()),
-        ),
-        if (kDebugMode)
-          _section(
-            'Ontwikkelmodus',
-            Icons.science,
-            () => _page(const SimulationScreen()),
-          ),
-        _section(
-          'About',
-          Icons.info,
-          () => showAboutDialog(
-            context: context,
-            applicationName: 'Ultimate Bike Computer',
-            applicationVersion: '2.1.0',
+          VeloSection(
+            title: 'Fietscomputer',
             children: [
-              const Text(
-                'Lokale ritregistratie, GPX en configureerbare fietsgegevens. Zie README en opleverrapport voor de precieze beperkingen.',
+              _section(
+                'Activiteitprofielen',
+                Icons.directions_bike,
+                () => _page(const ProfilesScreen()),
+              ),
+              _section(
+                'Eenheden',
+                Icons.straighten,
+                () => _dialog(
+                  'Eenheden',
+                  (update) => [
+                    RadioGroup<bool>(
+                      groupValue: Runtime.settings.value('imperial', false),
+                      onChanged: (v) async {
+                        await _set('imperial', v);
+                        update(() {});
+                      },
+                      child: const Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          RadioListTile<bool>(
+                            title: Text('Metrisch · km, km/h, m, °C'),
+                            value: false,
+                          ),
+                          RadioListTile<bool>(
+                            title: Text('Imperiaal · mi, mph, ft, °F'),
+                            value: true,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              _section(
+                'GPS en opname',
+                Icons.gps_fixed,
+                () => _dialog(
+                  'GPS en opname',
+                  (update) => [
+                    _switch(
+                      'Hoge GPS-nauwkeurigheid',
+                      'highAccuracy',
+                      true,
+                      update,
+                    ),
+                    _switch(
+                      'Automatische pauze (<3 km/h, 5 s)',
+                      'autoPause',
+                      false,
+                      update,
+                    ),
+                    const Text('GPS-interval · seconden (volgende rit)'),
+                    Slider(
+                      value: Runtime.settings
+                          .value('gpsInterval', 2)
+                          .toDouble(),
+                      min: 1,
+                      max: 10,
+                      divisions: 9,
+                      label: '${Runtime.settings.value('gpsInterval', 2)} s',
+                      onChanged: (v) async {
+                        await _set('gpsInterval', v.round());
+                        update(() {});
+                      },
+                    ),
+                    const Text('Maximale horizontale GPS-fout'),
+                    Slider(
+                      value: Runtime.settings.value('maxAccuracy', 50.0),
+                      min: 10,
+                      max: 100,
+                      divisions: 9,
+                      label:
+                          '${Runtime.settings.value('maxAccuracy', 50.0).round()} m',
+                      onChanged: (v) async {
+                        await _set('maxAccuracy', v);
+                        update(() {});
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              _section(
+                'Sensoren',
+                Icons.bluetooth,
+                () => _page(const SensorsScreen()),
+              ),
+              _section(
+                'Voeding & hydratatie',
+                Icons.water_drop_outlined,
+                () => _dialog(
+                  'Herinneringen',
+                  (update) => [
+                    for (final pair in [
+                      ('drinkMinutes', 'Drinken'),
+                      ('foodMinutes', 'Voeding'),
+                    ])
+                      Column(
+                        children: [
+                          Text(
+                            '${pair.$2}: ${Runtime.settings.value(pair.$1, 0)} min (0 = uit)',
+                          ),
+                          Slider(
+                            value: Runtime.settings
+                                .value(pair.$1, 0)
+                                .toDouble(),
+                            min: 0,
+                            max: 120,
+                            divisions: 24,
+                            onChanged: (v) async {
+                              await _set(pair.$1, v.round());
+                              update(() {});
+                            },
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
               ),
             ],
           ),
-        ),
-      ],
+          VeloSection(
+            title: 'Kaart en navigatie',
+            children: [
+              _section(
+                'Kaartprovider & stijl',
+                Icons.layers_outlined,
+                () => _page(const MapSettingsScreen()),
+              ),
+              _section(
+                'Navigatie',
+                Icons.near_me,
+                () => _dialog(
+                  'Navigatie-opties',
+                  (update) => [
+                    _switch(
+                      'Online OpenStreetMap · deelt kaartgebied',
+                      'onlineMap',
+                      false,
+                      update,
+                    ),
+                    _switch(
+                      'Automatisch herberekenen',
+                      'reroute',
+                      false,
+                      update,
+                    ),
+                    _switch('Gesproken aanwijzingen', 'voice', false, update),
+                    const Text('Routeringprofiel (provider ondersteund)'),
+                    DropdownButton<String>(
+                      value: Runtime.settings.value(
+                        'routingProfile',
+                        'cycling-regular',
+                      ),
+                      isExpanded: true,
+                      items: [
+                        for (final p in [
+                          'cycling-regular',
+                          'cycling-road',
+                          'cycling-mountain',
+                          'cycling-electric',
+                        ])
+                          DropdownMenuItem(value: p, child: Text(p)),
+                      ],
+                      onChanged: (v) async {
+                        await _set('routingProfile', v);
+                        update(() {});
+                      },
+                    ),
+                    const Text(
+                      'GPX-begeleiding werkt offline. Voor nieuwe routes en herberekening heb je verbinding met VELO nodig.',
+                    ),
+                  ],
+                ),
+              ),
+              _section(
+                'Offline gebieden',
+                Icons.download_outlined,
+                () => _page(const OfflineMapsScreen()),
+              ),
+              _section(
+                'Rasterkaart importeren',
+                Icons.map,
+                () => _dialog(
+                  'Offline kaarten',
+                  (update) => [
+                    Text(
+                      Runtime.settings.value<String?>('offlineMap', null) ==
+                              null
+                          ? 'Geen offline achtergrondkaart'
+                          : 'Raster MBTiles geïmporteerd. Controleer dekking en zoomniveaus vóór vertrek.',
+                    ),
+                    FilledButton(
+                      onPressed: () async {
+                        await _offline();
+                        update(() {});
+                      },
+                      child: const Text('Importeer raster MBTiles'),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        final path = Runtime.settings.value<String?>(
+                          'offlineMap',
+                          null,
+                        );
+                        await _set('offlineMap', null);
+                        if (path != null && await File(path).exists()) {
+                          await File(path).delete();
+                        }
+                        update(() {});
+                      },
+                      child: const Text('Offline kaart verwijderen'),
+                    ),
+                    const Text(
+                      'Gebruik uitsluitend kaarten waarvoor je offline gebruiksrechten hebt. Geen bulkdownload van openbare OSM-tiles.',
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          VeloSection(
+            title: 'Training',
+            children: [
+              _section(
+                'Trainingsprofiel & generator',
+                Icons.fitness_center,
+                () => _page(const TrainingScreen()),
+              ),
+              _section(
+                'Training · FTP',
+                Icons.fitness_center,
+                () => _dialog(
+                  'Trainingzones',
+                  (update) => [
+                    Text(
+                      'FTP: ${Runtime.settings.value('ftp', 0.0) == 0 ? 'niet ingesteld' : Runtime.settings.value('ftp', 0.0).round()} W',
+                    ),
+                    Slider(
+                      value: Runtime.settings
+                          .value('ftp', 50.0)
+                          .clamp(50.0, 600.0),
+                      min: 50,
+                      max: 600,
+                      divisions: 110,
+                      onChanged: (v) async {
+                        await _set('ftp', v);
+                        update(() {});
+                      },
+                    ),
+                    const Text(
+                      'Vermogenszones: ≤55%, ≤75%, ≤90%, ≤105%, ≤120%, ≤150%, >150% van FTP. Stel je eigen gemeten FTP in vóór een training.',
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          VeloSection(
+            title: 'Integraties',
+            children: [
+              _section(
+                'Verbonden diensten',
+                Icons.hub_outlined,
+                () => _page(const IntegrationsScreen()),
+              ),
+            ],
+          ),
+          VeloSection(
+            title: 'Gegevens en privacy',
+            children: [
+              _section(
+                'Synchronisatie en privacy',
+                Icons.privacy_tip_outlined,
+                () => _page(const DataSettingsScreen()),
+              ),
+              _section(
+                'Back-up & herstellen',
+                Icons.backup,
+                () => _dialog(
+                  'Gegevensbeheer',
+                  (update) => [
+                    const Text(
+                      'Een back-up bevat persoonlijke GPS-sporen, routes en instellingen. Je aanmeldgegevens worden niet meegenomen. Bewaar het bestand zelf veilig.',
+                    ),
+                    FilledButton(
+                      onPressed: () async {
+                        try {
+                          final data = await BackupService(Runtime.database)
+                              .export();
+                          await FilePicker.saveFile(
+                            fileName: 'bike-backup.json',
+                            mimeType: 'application/json',
+                            bytes: Uint8List.fromList(utf8.encode(data)),
+                          );
+                        } catch (e) {
+                          if (mounted) setState(() => error = e.toString());
+                        }
+                      },
+                      child: const Text('Back-up exporteren'),
+                    ),
+                    OutlinedButton(
+                      onPressed: () async {
+                        try {
+                          final files = await FilePicker.pickFiles(
+                            type: FileType.any,
+                          );
+                          if (files.isEmpty) return;
+                          final length = await files.first.length();
+                          if (length == null || length > 50 * 1024 * 1024) {
+                            throw StateError('Maximaal 50 MB');
+                          }
+                          await BackupService(Runtime.database).restore(
+                            utf8.decode(await files.first.readAsBytes()),
+                          );
+                          await Runtime.settings.load();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Back-up hersteld; bestaande ritten behouden',
+                                ),
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) setState(() => error = e.toString());
+                        }
+                      },
+                      child: const Text('Back-up importeren'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          VeloSection(
+            title: 'Over VELO',
+            children: [
+              FutureBuilder<Map?>(
+                future: PlatformBridge.call<Map>('appInfo'),
+                builder: (context, snapshot) => ListTile(
+                  leading: const Icon(Icons.info_outline),
+                  title: const Text('Versie en informatie'),
+                  subtitle: Text(
+                    snapshot.data == null
+                        ? 'VELO'
+                        : '${snapshot.data!['version']} (${snapshot.data!['build']})',
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => showAboutDialog(
+                    context: context,
+                    applicationName: 'VELO',
+                    applicationVersion: snapshot.data?['version'],
+                    children: const [
+                      Text(
+                        'Je fietscomputer, ritten, kaarten en trainingen op één plek.',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              _section(
+                'Licenties',
+                Icons.description_outlined,
+                () =>
+                    showLicensePage(context: context, applicationName: 'VELO'),
+              ),
+              _section(
+                'Diagnostiek',
+                Icons.monitor_heart_outlined,
+                () => _page(const DiagnosticsScreen()),
+              ),
+              _section(
+                'Android-apps',
+                Icons.apps,
+                () => _page(const AndroidAppsScreen()),
+              ),
+            ],
+          ),
+          if (kDebugMode)
+            VeloSection(
+              title: 'Ontwikkeling',
+              children: [
+                _section(
+                  'Ontwikkelmodus',
+                  Icons.science,
+                  () => _page(const SimulationScreen()),
+                ),
+              ],
+            ),
+        ],
+      ),
     ),
   );
 }

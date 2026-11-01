@@ -1,3 +1,5 @@
+> Historisch verslag van versie 2.3.0. SMTP en e-mailbevestiging zijn nadien ingeschakeld; de actuele UI- en mailresultaten staan in [UI_AUTH_RESULTS.md](UI_AUTH_RESULTS.md).
+
 # VELO — afwerking en werkelijk uitgevoerde controles
 
 Uitgevoerd op 1 november 2026. De actieve cloud-backend is uitsluitend Supabase-project `pdooxhljbutbsotbjbrt` van VELO. De app gebruikt geen LAN-backend, Docker, Portainer of eigen domein.

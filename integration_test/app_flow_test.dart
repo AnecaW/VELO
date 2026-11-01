@@ -5,7 +5,7 @@ import 'package:bike_computer/main.dart' as app;
 import 'package:bike_computer/core/runtime.dart';
 import 'package:bike_computer/app/router.dart';
 import 'package:bike_computer/services/navigation/gpx_route.dart';
-import 'package:bike_computer/features/settings/system_screens.dart';
+import 'package:bike_computer/features/more/android_apps_screen.dart';
 import 'package:bike_computer/features/settings/settings_screen.dart';
 import 'package:bike_computer/services/ride/session_codec.dart';
 import 'package:bike_computer/features/settings/sensors_screen.dart';
@@ -123,14 +123,15 @@ void main() {
       await Runtime.settings.set('keepOn', false);
       router.go('/settings');
       await tester.pump(const Duration(milliseconds: 500));
-      await until(find.text('Settings'));
-      await tester.tap(find.text('Sensors'));
+      await until(find.text('Instellingen'));
+      await tester.ensureVisible(find.text('Sensoren'));
+      await tester.tap(find.text('Sensoren'));
       await tester.pump(const Duration(milliseconds: 500));
       await until(find.byType(SensorsScreen));
       Navigator.of(tester.element(find.byType(SensorsScreen))).pop();
       await tester.pump(const Duration(milliseconds: 500));
       await tester.scrollUntilVisible(
-        find.text('Telefoon-apps'),
+        find.text('Android-apps'),
         300,
         scrollable: find
             .descendant(
@@ -139,11 +140,11 @@ void main() {
             )
             .first,
       );
-      await tester.tap(find.text('Telefoon-apps'));
+      await tester.tap(find.text('Android-apps'));
       await tester.pump(const Duration(milliseconds: 500));
-      await until(find.byType(AppsScreen));
+      await until(find.byType(AndroidAppsScreen));
       expect(find.text('Standaardlauncher instellen'), findsNothing);
-      Navigator.of(tester.element(find.byType(AppsScreen))).pop();
+      Navigator.of(tester.element(find.byType(AndroidAppsScreen))).pop();
       await tester.pump(const Duration(milliseconds: 500));
       router.go('/more');
       await tester.pump(const Duration(milliseconds: 500));

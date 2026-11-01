@@ -1,3 +1,5 @@
+import '../../widgets/velo_ui.dart';
+
 import 'package:bike_computer/core/platform_bridge.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -22,14 +24,12 @@ class _MapSettingsScreenState extends State<MapSettingsScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Kaartbronnen & stijlen')),
-    body: ListView(
-      padding: const EdgeInsets.all(20),
+    body: VeloPageList(
       children: [
         const Text(
           'Kies je kaartstijl',
           style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600),
         ),
-        const SizedBox(height: 12),
         const Text(
           'Kaartstijl bepaalt de weergave; OpenFreeMap levert OpenStreetMap-geografie. Online laden deelt het bekeken gebied met de provider.',
         ),

@@ -14,6 +14,8 @@ def main():
     parser.add_argument('--token-file', required=True)
     args = parser.parse_args()
     manager = Management(args.token_file)
+    if not manager.request('/config/auth').get('mailer_autoconfirm', False):
+        raise SystemExit('Refusing disposable registrations: email confirmation is enabled. Use SDK mocks and a real owner-approved mailbox for mail tests.')
     config = json.loads((ROOT / 'config/supabase.json').read_text())
     origin, key = config['SUPABASE_URL'], config['SUPABASE_PUBLISHABLE_KEY']
     users = []

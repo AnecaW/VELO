@@ -8,7 +8,12 @@ void main() {
   ) async {
     await tester.pumpWidget(const MaterialApp(home: SettingsScreen()));
 
-    await tester.tap(find.text('Activity Profiles'));
+    await tester.scrollUntilVisible(
+      find.text('Activiteitprofielen'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('Activiteitprofielen'));
     await tester.pumpAndSettle();
 
     expect(find.text('Activiteitprofielen'), findsOneWidget);

@@ -1,3 +1,5 @@
+import '../../widgets/velo_ui.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:bike_computer/features/profiles/cubits/activity_profile_cubit.dart';
@@ -29,8 +31,7 @@ class _ProfileList extends StatelessWidget {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
+      body: VeloPageList(
         children: [
           for (final p in state.profiles)
             Card(

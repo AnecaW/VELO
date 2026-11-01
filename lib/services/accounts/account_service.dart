@@ -53,6 +53,41 @@ class AccountService extends ChangeNotifier {
         (bytes[0] == 192 && bytes[1] == 168);
   }
 
+  String? confirmationEmail;
+  String? authLinkError;
+  Future<void> registerAccount(String name, String email, String password) =>
+      login(email, password, register: true);
+  Future<void> verifyEmailCode(
+    String email,
+    String code, {
+    bool recovery = false,
+  }) async {
+    throw AccountFailure('E-mailcodes zijn niet beschikbaar.');
+  }
+
+  Future<void> resendVerification(String email) async {
+    await request(
+      'POST',
+      '/api/v1/accounts/resend-verification',
+      body: {'email': email},
+      authenticated: false,
+    );
+  }
+
+  Future<void> completePasswordRecovery(String password) async {
+    await request(
+      'POST',
+      '/api/v1/accounts/password',
+      body: {'new_password': password},
+    );
+    await deleted();
+  }
+
+  void dismissAuthLinkError() {
+    authLinkError = null;
+    notifyListeners();
+  }
+
   bool initialized = false;
   AccountState state = AccountState.signedOut;
   Map<String, dynamic>? user;

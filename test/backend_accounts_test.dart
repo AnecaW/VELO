@@ -263,7 +263,7 @@ void main() {
     expect(find.text('Account aanmaken'), findsOneWidget);
     expect(find.text('Wachtwoord vergeten'), findsOneWidget);
     expect(find.byKey(const ValueKey('backend-url')), findsNothing);
-    expect(find.byType(TextField), findsNWidgets(2));
+    expect(find.byType(TextField), findsNWidgets(3));
   });
 
   testWidgets('first open signs in without asking for connection settings', (

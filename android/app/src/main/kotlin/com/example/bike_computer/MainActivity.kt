@@ -1,5 +1,11 @@
 package com.example.bike_computer
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.os.Handler
+import android.os.Looper
+import java.io.ByteArrayOutputStream
+import java.util.concurrent.Executors
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -16,6 +22,7 @@ import io.flutter.plugin.common.MethodChannel
 import java.util.Locale
 
 class MainActivity : FlutterActivity() {
+    private val appLoader = Executors.newSingleThreadExecutor()
     private var speech: TextToSpeech? = null
     private var notificationResult: MethodChannel.Result? = null
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -24,15 +31,38 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "bike_computer/device").setMethodCallHandler { call, result ->
             try {
                 when (call.method) {
-                    "apps" -> {
-                        val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-                        val apps = packageManager.queryIntentActivities(intent, 0)
-                            .filter { it.activityInfo.packageName != packageName }
-                            .distinctBy { it.activityInfo.packageName }
-                            .map { mapOf("package" to it.activityInfo.packageName, "name" to it.loadLabel(packageManager).toString()) }
-                            .sortedBy { it["name"]?.lowercase() }
-                        result.success(apps)
+                    "appInfo" -> {
+                        val info = packageManager.getPackageInfo(packageName, 0)
+                        result.success(mapOf("version" to info.versionName, "build" to if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()))
                     }
+                    "apps" -> {
+                        appLoader.execute {
+                            try {
+                                val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+                                val apps = packageManager.queryIntentActivities(intent, 0)
+                                    .filter { it.activityInfo.packageName != packageName }
+                                    .distinctBy { it.activityInfo.packageName }
+                                    .map { info ->
+                                        val icon = try {
+                                            val drawable = info.loadIcon(packageManager)
+                                            val bitmap = Bitmap.createBitmap(96, 96, Bitmap.Config.ARGB_8888)
+                                            drawable.setBounds(0, 0, 96, 96)
+                                            drawable.draw(Canvas(bitmap))
+                                            val bytes = ByteArrayOutputStream()
+                                            bitmap.compress(Bitmap.CompressFormat.PNG, 100, bytes)
+                                            bitmap.recycle()
+                                            bytes.toByteArray()
+                                        } catch (_: Exception) { null }
+                                        mapOf("package" to info.activityInfo.packageName,
+                                            "name" to info.loadLabel(packageManager).toString(), "icon" to icon)
+                                    }.sortedBy { (it["name"] as String).lowercase() }
+                                Handler(Looper.getMainLooper()).post { result.success(apps) }
+                            } catch (_: Exception) {
+                                Handler(Looper.getMainLooper()).post { result.error("apps_unavailable", "Apps konden niet worden geladen", null) }
+                            }
+                        }
+                    }
+
                     "launch" -> {
                         val pkg = call.arguments as String
                         val intent = packageManager.getLaunchIntentForPackage(pkg) ?: throw IllegalArgumentException("App niet beschikbaar")
@@ -74,5 +104,5 @@ class MainActivity : FlutterActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 55) { notificationResult?.success(null); notificationResult = null }
     }
-    override fun onDestroy() { speech?.stop(); speech?.shutdown(); super.onDestroy() }
+    override fun onDestroy() { appLoader.shutdown(); speech?.stop(); speech?.shutdown(); super.onDestroy() }
 }

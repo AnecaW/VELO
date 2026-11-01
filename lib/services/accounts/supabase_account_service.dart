@@ -24,6 +24,8 @@ class SupabaseAccountService extends AccountService {
   Future<void> _identityQueue = Future.value();
   int _generation = 0;
   bool recovery = false;
+  bool _explicitAuth = false;
+  String? _signupName;
   @override
   bool get passwordRecovery => recovery;
   @override
@@ -32,12 +34,47 @@ class SupabaseAccountService extends AccountService {
   Future<SupabaseClient> _sdk() async {
     final sdk = _supabase ??=
         supabase ?? await VeloSupabase.initialize(background: background);
-    _events ??= sdk.auth.onAuthStateChange.listen((event) {
-      if (event.event == AuthChangeEvent.passwordRecovery) {
-        recovery = true;
-        _identityQueue = _identityQueue.then((_) => _adopt(event.session));
-      }
-    }, onError: (Object _) {});
+    _events ??= sdk.auth.onAuthStateChange.listen(
+      (event) {
+        if (_explicitAuth) return;
+        if (event.event == AuthChangeEvent.passwordRecovery) {
+          recovery = true;
+          authLinkError = null;
+          _generation++;
+          _identityQueue = _identityQueue
+              .then((_) => _adopt(event.session))
+              .catchError((Object _) {
+                _state(
+                  AccountState.unavailable,
+                  'Je account kon niet worden geopend. Probeer opnieuw.',
+                );
+              });
+        } else if (event.event == AuthChangeEvent.signedIn &&
+            event.session != null) {
+          confirmationEmail = null;
+          authLinkError = null;
+          _generation++;
+          _identityQueue = _identityQueue
+              .then((_) => _adopt(event.session))
+              .catchError((Object _) {});
+        }
+      },
+      onError: (Object e) {
+        if (e is AuthException &&
+            [
+              'otp_expired',
+              'flow_state_expired',
+              'flow_state_not_found',
+              'bad_code_verifier',
+              'bad_jwt',
+              'validation_failed',
+              'unexpected_failure',
+            ].any((code) => code == e.code || code == e.statusCode)) {
+          authLinkError = 'Deze link is ongeldig of verlopen. Vraag een nieuwe e-mail aan en open de link op dit toestel.';
+          notifyListeners();
+        }
+      },
+    );
     return sdk;
   }
 
@@ -52,7 +89,12 @@ class SupabaseAccountService extends AccountService {
     await onIdentityChange?.call(next?.id);
     user = next == null
         ? null
-        : {'id': next.id, 'email': next.email, 'created_at': next.createdAt};
+        : {
+            'id': next.id,
+            'email': next.email,
+            'created_at': next.createdAt,
+            'name': next.userMetadata?['display_name'],
+          };
     initialized = true;
     _state(next == null ? AccountState.signedOut : AccountState.signedIn);
   }
@@ -209,6 +251,8 @@ class SupabaseAccountService extends AccountService {
     bool register = false,
   }) async {
     _generation++;
+    _explicitAuth = true;
+    confirmationEmail = null;
     _state(AccountState.signingIn);
     try {
       final sdk = await _sdk();
@@ -218,12 +262,14 @@ class SupabaseAccountService extends AccountService {
                 email: email.trim(),
                 password: password,
                 emailRedirectTo: VeloSupabase.redirect,
+                data: {'display_name': _signupName ?? ''},
               )
             : await sdk.auth.signInWithPassword(
                 email: email.trim(),
                 password: password,
               );
         if (result.session == null) {
+          confirmationEmail = email.trim();
           _state(
             AccountState.signedOut,
             'Controleer je e-mail om je account te bevestigen.',
@@ -248,6 +294,97 @@ class SupabaseAccountService extends AccountService {
           }
         }
       });
+    } catch (e) {
+      if (e is AuthException && e.code == 'email_not_confirmed') {
+        confirmationEmail = email.trim();
+      }
+      throw _failure(e);
+    } finally {
+      _explicitAuth = false;
+    }
+  }
+
+  @override
+  Future<void> registerAccount(
+    String name,
+    String email,
+    String password,
+  ) async {
+    _signupName = name.trim();
+    try {
+      await login(email, password, register: true);
+    } finally {
+      _signupName = null;
+    }
+  }
+
+  @override
+  Future<void> verifyEmailCode(
+    String email,
+    String code, {
+    bool recovery = false,
+  }) async {
+    if (!RegExp(r'^\d{6,10}$').hasMatch(code.trim())) {
+      throw AccountFailure('Vul de code uit je e-mail in.');
+    }
+    try {
+      _explicitAuth = true;
+      final result = await (await _sdk()).auth
+          .verifyOTP(
+            email: email.trim(),
+            token: code.trim(),
+            type: recovery ? OtpType.recovery : OtpType.email,
+          )
+          .timeout(const Duration(seconds: 20));
+      if (result.session == null) {
+        throw AccountFailure('Vraag een nieuwe code aan.');
+      }
+      this.recovery = recovery;
+      authLinkError = null;
+      confirmationEmail = null;
+      _generation++;
+      await store.write(
+        SecureSupabaseStorage.key,
+        jsonEncode(result.session!.toJson()),
+      );
+      await _adopt(result.session);
+    } on TimeoutException {
+      throw AccountFailure('Geen verbinding met VELO. Probeer opnieuw.');
+    } on AuthRetryableFetchException {
+      throw AccountFailure('Geen verbinding met VELO. Probeer opnieuw.');
+    } on AuthException {
+      throw AccountFailure(
+        'Deze code is onjuist of verlopen. Vraag indien nodig een nieuwe mail aan.',
+      );
+    } finally {
+      _explicitAuth = false;
+    }
+  }
+
+  @override
+  Future<void> resendVerification(String email) async {
+    try {
+      await (await _sdk()).auth.resend(
+        type: OtpType.signup,
+        email: email.trim(),
+        emailRedirectTo: VeloSupabase.redirect,
+      );
+    } catch (e) {
+      throw _failure(e);
+    }
+  }
+
+  @override
+  Future<void> completePasswordRecovery(String password) async {
+    if (!recovery) throw AccountFailure('Open eerst een geldige herstelmail.');
+    if (password.length < 12) {
+      throw AccountFailure('Gebruik minimaal 12 tekens.');
+    }
+    try {
+      final sdk = await _sdk();
+      await sdk.auth.updateUser(UserAttributes(password: password));
+      await sdk.auth.signOut(scope: SignOutScope.global);
+      await deleted();
     } catch (e) {
       throw _failure(e);
     }

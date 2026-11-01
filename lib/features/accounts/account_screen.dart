@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
 import 'dart:convert';
+import 'dart:async';
+
+import '../../widgets/velo_ui.dart';
+import 'password_screens.dart';
 
 import '../../core/runtime.dart';
 import '../../services/accounts/account_service.dart';
@@ -16,12 +20,24 @@ class AccountScreen extends StatefulWidget {
 
 class _AccountScreenState extends State<AccountScreen> {
   late final account = widget.account ?? Runtime.accounts;
-  final email = TextEditingController(),
+  final name = TextEditingController(),
+      email = TextEditingController(),
       password = TextEditingController(),
       nextPassword = TextEditingController();
   bool register = false, busy = false;
   bool get uiBusy => busy || account.state == AccountState.signingIn;
   String? message;
+  DateTime? resendAfter;
+  Timer? cooldown;
+  void startCooldown() {
+    resendAfter = DateTime.now().add(const Duration(seconds: 60));
+    cooldown?.cancel();
+    cooldown = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+      if (DateTime.now().isAfter(resendAfter!)) cooldown?.cancel();
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -35,7 +51,8 @@ class _AccountScreenState extends State<AccountScreen> {
   @override
   void dispose() {
     account.removeListener(changed);
-    for (final c in [email, password, nextPassword]) {
+    cooldown?.cancel();
+    for (final c in [name, email, password, nextPassword]) {
       c.dispose();
     }
     super.dispose();
@@ -58,16 +75,6 @@ class _AccountScreenState extends State<AccountScreen> {
     if (mounted) setState(() => busy = false);
   }
 
-  Future<void> reset() async {
-    await account.request(
-      'POST',
-      '/api/v1/accounts/password-reset',
-      body: {'email': email.text.trim()},
-      authenticated: false,
-    );
-    message = 'Als dit account bestaat, ontvang je instructies per e-mail.';
-  }
-
   Future<void> allowAccountChange() async {
     if (widget.account == null && await Runtime.hasOpenActivity()) {
       throw AccountFailure(
@@ -83,8 +90,21 @@ class _AccountScreenState extends State<AccountScreen> {
     if (password.text.length < 12) {
       throw AccountFailure('Gebruik een wachtwoord van minimaal 12 tekens.');
     }
+    if (register &&
+        (name.text.trim().length < 2 || name.text.trim().length > 80)) {
+      throw AccountFailure('Vul je naam in (2 tot 80 tekens).');
+    }
     await allowAccountChange();
-    await account.login(email.text.trim(), password.text, register: register);
+    if (register) {
+      await account.registerAccount(
+        name.text.trim(),
+        email.text.trim(),
+        password.text,
+      );
+    } else {
+      await account.login(email.text.trim(), password.text);
+    }
+    if (account.confirmationEmail != null) startCooldown();
     if (mounted) password.clear();
   });
 
@@ -112,25 +132,22 @@ class _AccountScreenState extends State<AccountScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: Text(
-        widget.onContinueOffline != null ? 'Welkom bij VELO' : 'VELO-account',
-      ),
+      title: Text(widget.onContinueOffline != null ? 'VELO' : 'VELO-account'),
     ),
-    body: ListView(
-      padding: const EdgeInsets.all(20),
+    body: VeloPageList(
+      maxWidth: 520,
       children: [
-        Text('Jouw VELO', style: Theme.of(context).textTheme.headlineLarge),
-        const SizedBox(height: 12),
+        Text(
+          account.user != null
+              ? 'Je account'
+              : register
+              ? 'Maak je account'
+              : 'Welkom bij VELO',
+          style: Theme.of(context).textTheme.headlineSmall,
+        ),
         const Text(
           'Bewaar je ritten bij je account en verbind je favoriete apps. Je fietscomputer blijft ook zonder verbinding werken.',
         ),
-        if (widget.onContinueOffline != null)
-          const Padding(
-            padding: EdgeInsets.only(top: 12),
-            child: Text(
-              'Start je rit met START. Je ritten blijven eerst op dit toestel bewaard en synchroniseren wanneer er verbinding is. Strava vind je later bij Apps.',
-            ),
-          ),
         if (account.localNetworkOnly)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),
@@ -138,11 +155,60 @@ class _AccountScreenState extends State<AccountScreen> {
           ),
         if (uiBusy) const LinearProgressIndicator(),
         if (message ?? account.message case final String text)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Text(text, key: const ValueKey('account-message')),
+          VeloNotice(text, key: const ValueKey('account-message')),
+        if (account.user == null && account.confirmationEmail != null) ...[
+          const Icon(Icons.mark_email_read_outlined, size: 40),
+          const Text(
+            'Bevestig je e-mailadres',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
           ),
-        if (account.user == null) ...[
+          Text(
+            'We hebben een bevestigingsmail aangevraagd voor ${account.confirmationEmail}. Open de link op dit toestel om verder te gaan.',
+          ),
+          EmailCodeEntry(account: account, email: account.confirmationEmail!),
+          FilledButton(
+            onPressed: uiBusy || (resendAfter?.isAfter(DateTime.now()) ?? false)
+                ? null
+                : () => run(() async {
+                    await account.resendVerification(
+                      account.confirmationEmail!,
+                    );
+                    startCooldown();
+                    message = 'Een nieuwe bevestigingsmail is aangevraagd.';
+                  }),
+            child: Text(
+              (resendAfter?.isAfter(DateTime.now()) ?? false)
+                  ? 'Opnieuw versturen over ${resendAfter!.difference(DateTime.now()).inSeconds + 1} s'
+                  : 'Verificatiemail opnieuw versturen',
+            ),
+          ),
+          TextButton(
+            onPressed: () => setState(() {
+              account.confirmationEmail = null;
+              register = false;
+              message = null;
+            }),
+            child: const Text('Terug naar inloggen'),
+          ),
+          if (widget.onContinueOffline != null)
+            TextButton(
+              onPressed: widget.onContinueOffline,
+              child: const Text('Verder zonder account'),
+            ),
+        ] else if (account.user == null) ...[
+          if (register)
+            TextField(
+              key: const ValueKey('account-name'),
+              controller: name,
+              autofillHints: const [AutofillHints.name],
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+              maxLength: 80,
+              decoration: const InputDecoration(
+                labelText: 'Naam',
+                counterText: '',
+              ),
+            ),
           TextField(
             key: const ValueKey('account-email'),
             controller: email,
@@ -167,7 +233,6 @@ class _AccountScreenState extends State<AccountScreen> {
             enableSuggestions: false,
             autocorrect: false,
           ),
-          const SizedBox(height: 16),
           FilledButton(
             key: const ValueKey('account-submit'),
             onPressed: uiBusy ? null : submit,
@@ -182,7 +247,17 @@ class _AccountScreenState extends State<AccountScreen> {
             ),
           ),
           TextButton(
-            onPressed: uiBusy ? null : () => run(reset),
+            onPressed: uiBusy
+                ? null
+                : () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => ForgotPasswordScreen(
+                        account: account,
+                        email: email.text.trim(),
+                      ),
+                    ),
+                  ),
             child: const Text('Wachtwoord vergeten'),
           ),
           if (widget.onContinueOffline != null)
@@ -197,7 +272,9 @@ class _AccountScreenState extends State<AccountScreen> {
               title: Text(
                 account.user?['email'] ?? account.user?['username'] ?? 'VELO',
               ),
-              subtitle: const Text('Aangemeld bij VELO'),
+              subtitle: Text(
+                account.user?['name'] as String? ?? 'Aangemeld bij VELO',
+              ),
             ),
           ),
           FilledButton(
@@ -286,6 +363,7 @@ class _AccountScreenState extends State<AccountScreen> {
             onPressed: uiBusy ? null : () => run(account.restore),
             child: const Text('Verbinding opnieuw proberen'),
           ),
+          Text('Beveiliging', style: Theme.of(context).textTheme.titleSmall),
           if (!account.passwordRecovery)
             TextField(
               controller: password,
@@ -351,6 +429,9 @@ class _AccountScreenState extends State<AccountScreen> {
                     await account.deleted();
                     password.clear();
                   }),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
             child: const Text('Account verwijderen'),
           ),
         ],

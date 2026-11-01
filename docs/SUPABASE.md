@@ -4,7 +4,7 @@ De actieve app gebruikt uitsluitend het beheerde Supabase-project `pdooxhljbutbs
 
 ## App en accounts
 
-`supabase_flutter` is de officiële SDK. `SupabaseAccountService` sluit deze aan op de bestaande accountpagina en offline synchronisatie. Auth gebruikt e-mail/wachtwoord, sessievernieuwing, uitloggen en accountverwijdering. Registratie staat aan, e-mailbevestiging staat uit voor directe toegang, wachtwoorden vereisen minimaal 12 tekens en access-JWT's verlopen na 15 minuten. Supabase JWT's kunnen tot hun vervaltijd geldig blijven na uitloggen; refresh-sessies worden ingetrokken. Dit is geen claim van onmiddellijke JWT-intrekking.
+`supabase_flutter` is de officiële SDK. `SupabaseAccountService` sluit deze aan op de bestaande accountpagina en offline synchronisatie. Auth gebruikt e-mail/wachtwoord, sessievernieuwing, uitloggen en accountverwijdering. Registratie met naam staat aan, e-mailbevestiging is verplicht, wachtwoorden vereisen minimaal 12 tekens en access-JWT's verlopen na 15 minuten. Supabase JWT's kunnen tot hun vervaltijd geldig blijven na uitloggen; refresh-sessies worden ingetrokken. Dit is geen claim van onmiddellijke JWT-intrekking.
 
 De SDK-sessie en PKCE-verifier staan in Android secure storage. Foreground en Workmanager verversen sessies onder dezelfde lokale databaselease. Offline uitloggen wist de lokale sessie; een intrekkingsopdracht blijft uitsluitend in secure storage totdat de verbinding terug is. Een oude intrekking gebruikt een geïsoleerde SDK-client en overschrijft geen nieuwe login.
 
@@ -52,14 +52,18 @@ De beheerclient verstuurt credentials alleen via HTTPS naar de vaste Supabase Ma
 - `ORS_API_KEY` voor online routeplanning.
 - `VELO_TOKEN_ENCRYPTION_KEY` en `VELO_SCHEDULER_TOKEN` zijn al veilig aangemaakt. De encryptiesleutel mag niet zomaar worden vervangen; bewaar hem met databasebackups buiten deze machine. De lokale beveiligde kopie staat in de secrets-map van de eigenaar.
 
-Eigen SMTP is op verzoek nog niet ingesteld. Directe registratie en login hebben geen mailserver nodig. Wachtwoordherstel blijft expliciet uitgeschakeld en toont een begrijpelijke melding. De SDK-mailflow en app-callback zijn voorbereid. Configureer later SMTP in Supabase Auth en zet de serversecret `VELO_PASSWORD_RESET_ENABLED` op `true`; daarvoor is geen nieuwe appbuild nodig. Er wordt geen succesvolle mailaflevering geclaimd.
+Supabase Auth heeft inmiddels eigen SMTP-configuratie. `configure-auth` controleert uitsluitend of de vereiste velden aanwezig zijn, behoudt de geheime waarden, verplicht e-mailbevestiging, stelt de toegestane callback `ultimatebike://auth/callback` in en schakelt herstel in met `VELO_PASSWORD_RESET_ENABLED=true`. Confirmation- en recovery-templates bevatten zowel de officiële `ConfirmationURL` als de officiële `Token`. Open een link op hetzelfde Android-toestel waarop de aanvraag is gedaan (PKCE), of voer de code uit de mail in VELO in wanneer je de mail op bijvoorbeeld een iPhone leest. Safari op een iPhone zonder VELO kan het Android-appadres niet openen. Een al bevestigd account kan gewoon inloggen.
+
+Registratie vanaf de fysieke Huawei, ontvangst van de bevestigingsmail en bevestiging van het echte eigenaaraccount zijn gecontroleerd. De eigenaar heeft daarna bevestigd dat hij de herstelcode heeft ingevoerd en zijn eigen wachtwoord heeft ingesteld. De naam komt via een Auth-trigger in het eigen RLS-profiel; er is geen openbare gebruikerslijst. Mailsecrets blijven uitsluitend in Supabase Auth.
 
 Maak databasebackups via de beschikbare Supabase-backupvoorziening of een beveiligde PostgreSQL-export, afhankelijk van het projectplan. Bewaar de AES-sleutel apart. Herstel eerst in een apart project en controleer RLS, migraties, cascadegedrag, secrets en cron voordat je de app omzet. Deze nieuwe cloudinstallatie heeft geen geclaimde externe disaster-recoverykopie.
 
 ## Controles
 
-`scripts/test_supabase_live.py --token-file <privaat-tokenbestand>` maakt twee tijdelijke accounts aan en ruimt ze altijd op. Het controleert echte registratie, login, incorrect wachtwoord, database, anonieme toegang, cross-account RLS, spoofed eigenaar, private RPC-toegang, conflicten, tombstones, Edge-authenticatie, ontbrekende providerconfiguratie, sessievernieuwing, intrekking en accountverwijdering. Laatste volledige run: **35 controles geslaagd**.
+De oude `scripts/test_supabase_live.py`-run had 35 geslaagde controles toen autoconfirm aanstond. Het script weigert nu wegwerpregistraties met actieve mailbevestiging. Ook de oude native wegwerpaccounttest wordt op het productieproject overgeslagen. Deze historische resultaten zijn geen nieuwe SMTP-test.
 
-Daarnaast testen Fluttertests de SDK-adapter, secure storage en bestaande lokale functies. `integration_test/account_flow_test.dart` test echte registratie, sessieherstel, uitloggen, login en synchronisatie op Android. Deno controleert types en test Edge-authenticatie, schedulerafscherming, eigenaargebonden encryptie en GPX. GitHub-CI gebruikt geen productiecredentials.
+De huidige tests staan in [UI_AUTH_RESULTS.md](UI_AUTH_RESULTS.md): SDK-mocks gebruiken uitsluitend lokale HTTP-fixtures; echte productiecontroles gebruiken alleen het door de eigenaar aangewezen account. RLS voor een andere identiteit is in een teruggedraaide SQL-transactie gecontroleerd zonder een extra account te maken. Deno test Edge-authenticatie, schedulerafscherming, eigenaargebonden encryptie en GPX. GitHub-CI gebruikt geen productiecredentials.
 
 Officiële referenties: [Flutter SDK](https://supabase.com/docs/reference/dart/introduction), [RLS](https://supabase.com/docs/guides/database/postgres/row-level-security), [Edge-authenticatie](https://supabase.com/docs/guides/functions/auth), [Management API](https://supabase.com/docs/reference/api/introduction).
+
+Voor de mailcode en links: [officiële OTP API](https://supabase.com/docs/reference/dart/auth-verifyotp), [mailtemplates](https://supabase.com/docs/guides/auth/auth-email-templates), [mobiele deep links](https://supabase.com/docs/guides/auth/native-mobile-deep-linking).

@@ -227,6 +227,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Widget _buildRideCard(BuildContext context, dynamic ride, int position) {
     return Card(
+      margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(

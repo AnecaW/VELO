@@ -7,6 +7,7 @@ import 'package:bike_computer/features/home/home_screen.dart';
 import 'package:bike_computer/features/navigation/navigation_screen.dart';
 import 'package:bike_computer/features/ride/ride_screen.dart';
 import 'package:bike_computer/features/training/training_screen.dart';
+import 'package:bike_computer/features/more/android_apps_screen.dart';
 import 'package:bike_computer/features/more/more_screen.dart';
 import 'package:bike_computer/features/settings/settings_screen.dart';
 import 'package:bike_computer/features/history/history_screen.dart';
@@ -56,7 +57,7 @@ class ScaffoldWithNavBar extends StatelessWidget {
                                   vertical: 6,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: i == 0
+                                  color: i == 2
                                       ? Theme.of(context).colorScheme.primary
                                       : navigationShell.currentIndex == i
                                       ? Theme.of(context).colorScheme.primary
@@ -68,12 +69,12 @@ class ScaffoldWithNavBar extends StatelessWidget {
                                   [
                                     Icons.speed,
                                     Icons.map_outlined,
+                                    Icons.apps_rounded,
                                     Icons.history_rounded,
                                     Icons.fitness_center,
-                                    Icons.grid_view_rounded,
                                   ][i],
-                                  size: i == 0 ? 26 : 23,
-                                  color: i == 0
+                                  size: i == 2 ? 26 : 23,
+                                  color: i == 2
                                       ? Colors.black
                                       : navigationShell.currentIndex == i
                                       ? Theme.of(context).colorScheme.primary
@@ -86,9 +87,9 @@ class ScaffoldWithNavBar extends StatelessWidget {
                                 [
                                   'Fiets',
                                   'Kaart',
+                                  'Apps',
                                   'Activiteiten',
                                   'Training',
-                                  'Apps',
                                 ][i],
                                 maxLines: 1,
                                 style: TextStyle(
@@ -135,6 +136,14 @@ final router = GoRouter(
         ),
         StatefulShellBranch(
           routes: [
+            GoRoute(
+              path: '/apps',
+              builder: (_, s) => const AndroidAppsScreen(),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
             GoRoute(path: '/history', builder: (_, s) => const HistoryScreen()),
           ],
         ),
@@ -146,14 +155,10 @@ final router = GoRouter(
             ),
           ],
         ),
-        StatefulShellBranch(
-          routes: [
-            GoRoute(path: '/more', builder: (_, s) => const MoreScreen()),
-          ],
-        ),
       ],
     ),
     GoRoute(path: '/settings', builder: (_, s) => const SettingsScreen()),
+    GoRoute(path: '/more', builder: (_, s) => const MoreScreen()),
     GoRoute(path: '/home', builder: (_, s) => const HomeScreen()),
     GoRoute(
       path: '/ride/summary',

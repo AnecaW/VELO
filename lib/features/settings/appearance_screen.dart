@@ -1,3 +1,5 @@
+import '../../widgets/velo_ui.dart';
+
 import 'package:flutter/material.dart';
 import 'package:bike_computer/core/runtime.dart';
 
@@ -16,14 +18,12 @@ class _AppearanceScreenState extends State<AppearanceScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('OLED & uiterlijk')),
-    body: ListView(
-      padding: const EdgeInsets.all(20),
+    body: VeloPageList(
       children: [
         const Text(
           'Rust op je scherm.',
-          style: TextStyle(fontSize: 32, fontWeight: FontWeight.w600),
+          style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600),
         ),
-        const SizedBox(height: 20),
         for (final theme in [
           ('oled', 'OLED Black', 'Echt zwart, optimaal contrast'),
           ('graphite', 'Dark Graphite', 'Zachte grafietvlakken'),

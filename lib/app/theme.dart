@@ -37,7 +37,7 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         titleTextStyle: TextStyle(
-          fontSize: 22,
+          fontSize: 20,
           fontWeight: FontWeight.w600,
           color: scheme.onSurface,
           letterSpacing: -.5,
@@ -46,9 +46,9 @@ class AppTheme {
       cardTheme: CardThemeData(
         color: surface,
         elevation: 0,
-        margin: const EdgeInsets.symmetric(vertical: 5),
+        margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(14),
           side: BorderSide(color: scheme.outline.withValues(alpha: .25)),
         ),
       ),
@@ -59,27 +59,47 @@ class AppTheme {
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide.none,
         ),
-        contentPadding: const EdgeInsets.all(18),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          minimumSize: const Size(48, 54),
+          minimumSize: const Size(48, 48),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(14),
           ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size(48, 52),
+          minimumSize: const Size(48, 48),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(14),
           ),
         ),
       ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          minimumSize: const Size(48, 44),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        ),
+      ),
+      listTileTheme: const ListTileThemeData(
+        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        minLeadingWidth: 24,
+        horizontalTitleGap: 12,
+        minVerticalPadding: 10,
+      ),
+      dividerTheme: DividerThemeData(
+        color: scheme.outline.withValues(alpha: .18),
+        space: 1,
+        thickness: 1,
+      ),
       dialogTheme: DialogThemeData(
         backgroundColor: surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
       textTheme: TextTheme(
         displayLarge: TextStyle(

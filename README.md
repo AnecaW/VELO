@@ -4,21 +4,23 @@ Android-fietscomputer met ritregistratie, offline kaarten, sensoren, navigatie, 
 
 ## Gebruiken
 
-1. Download de [Supabase-versie voor Android](https://github.com/AnecaW/VELO/releases/tag/android-supabase-v2.3.0) en installeer `velo-supabase.apk`.
-2. Maak een nieuw VELO-account aan of log in met je Supabase-account.
+1. Download de [Supabase-versie voor Android](https://github.com/AnecaW/VELO/releases/tag/android-supabase-v2.4.0) en installeer `velo-supabase.apk`.
+2. Maak een nieuw VELO-account aan, bevestig je e-mail en log in. Lees je de mail op een ander toestel? Vul dan de mailcode in VELO in.
 3. Begin met fietsen. Eigen ritten, routes, profielen, trainingsplannen en instellingen synchroniseren automatisch.
 
 Je hoeft geen serveradres, poort of sleutel in te voeren. De app gebruikt rechtstreeks HTTPS naar het beheerde Supabase-project en werkt ook buiten het thuisnetwerk. Lokale fietscomputerfuncties en offline gegevens blijven beschikbaar bij verbindingsverlies en zonder account.
 
+De centrale Apps-knop toont echte te openen Android-apps met hun eigen iconen. Interne VELO-functies staan apart. Instellingen zijn gegroepeerd en de OLED-interface gebruikt consistente componenten. Zie [UI- en mailcontrole](docs/UI_AUTH_RESULTS.md).
+
 ## Actieve architectuur
 
 - Flutter met de officiële `supabase_flutter` SDK, Android secure storage en bestaande lokale Drift/SQLite-opslag.
-- Supabase Auth voor registratie met directe toegang, login, sessieherstel, wachtwoordbeheer en uitloggen.
+- Supabase Auth voor registratie met naam en e-mailbevestiging, login, sessieherstel, wachtwoordbeheer en uitloggen.
 - PostgreSQL met RLS op alle gebruikerstabellen, accountisolatie, revisiecontrole en incrementele synchronisatie.
 - Edge Functions voor serversecrets, providerintegraties, navigatieproxy en accountverwijdering.
 - Supabase Cron/Vault voor periodiek werk. Geen eigen server, Docker, Portainer of eigen domein nodig.
 
-Strava is voorbereid maar mist echte providercredentials. Online routeplanning mist een OpenRouteService-key. Deze diensten worden niet als werkend gepresenteerd. Eigen SMTP is nog niet ingesteld; succesvolle mailaflevering wordt niet geclaimd.
+Strava is voorbereid maar mist echte providercredentials. Online routeplanning mist een OpenRouteService-key. Deze diensten worden niet als werkend gepresenteerd. Supabase SMTP, e-mailbevestiging en wachtwoordherstel zijn ingeschakeld en met de echte eigenaar getest. De app bevat geen SMTP-secrets.
 
 ## Project
 
@@ -27,7 +29,7 @@ Strava is voorbereid maar mist echte providercredentials. Online routeplanning m
 - `supabase/functions/`: gedeployde Edge Functions en beveiligingstests.
 - `config/supabase.json`: uitsluitend publieke projectconfiguratie, geen beheergeheimen.
 - `scripts/supabase_admin.py`: migraties/deployment via Supabase Management API, zonder Docker.
-- `scripts/test_supabase_live.py`: echte account-, database- en isolatietests met opruiming.
+- `scripts/test_supabase_live.py`: historische tests voor een afzonderlijk autoconfirm-testproject; weigert wegwerpregistraties wanneer mailbevestiging aanstaat.
 - `backend/` en `deployment/`: historische self-hosted broncode, behouden voor referentie. De actieve app gebruikt deze niet en de Docker-imagepublicatieworkflow is verwijderd.
 
 ## Bouwen en controleren

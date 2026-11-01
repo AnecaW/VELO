@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../services/accounts/account_service.dart';
 import 'account_screen.dart';
+import 'password_screens.dart';
 
 /// Account onboarding never prevents local recording when connectivity is lost.
 class AccountGate extends StatefulWidget {
@@ -20,6 +21,22 @@ class _AccountGateState extends State<AccountGate> {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: widget.account,
     builder: (context, _) {
+      if (widget.account.authLinkError != null) {
+        return Navigator(
+          key: const ValueKey('invalid-auth-link'),
+          onGenerateRoute: (_) => MaterialPageRoute<void>(
+            builder: (_) => InvalidAuthLinkScreen(account: widget.account),
+          ),
+        );
+      }
+      if (widget.account.passwordRecovery) {
+        return Navigator(
+          key: const ValueKey('password-recovery'),
+          onGenerateRoute: (_) => MaterialPageRoute<void>(
+            builder: (_) => PasswordRecoveryScreen(account: widget.account),
+          ),
+        );
+      }
       if (!widget.account.initialized) {
         return const Scaffold(body: Center(child: CircularProgressIndicator()));
       }

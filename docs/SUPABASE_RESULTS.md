@@ -1,3 +1,5 @@
+> Historisch verslag van versie 2.3.0. SMTP en e-mailbevestiging zijn nadien ingeschakeld; de actuele UI- en mailresultaten staan in [UI_AUTH_RESULTS.md](UI_AUTH_RESULTS.md).
+
 # Supabase-uitvoering — 1 november 2026
 
 Project `pdooxhljbutbsotbjbrt` (VELO), status `ACTIVE_HEALTHY`. De app gebruikt de officiële Flutter SDK rechtstreeks via HTTPS. Er is geen eigen domein of lokale backendverbinding nodig.

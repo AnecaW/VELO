@@ -521,28 +521,33 @@ class _RideScreenState extends State<RideScreen> {
                                           letterSpacing: 1.5,
                                         ),
                                       ),
-                                      Expanded(
-                                        child: FittedBox(
-                                          fit: BoxFit.scaleDown,
-                                          child: Text(
-                                            value,
-                                            style: TextStyle(
-                                              fontSize: field == 'Speed'
-                                                  ? 64
-                                                  : 42,
-                                              fontWeight: FontWeight.w600,
-                                              fontFeatures: const [
-                                                FontFeature.tabularFigures(),
-                                              ],
-                                              color: field == 'Speed'
-                                                  ? Theme.of(context)
-                                                        .colorScheme
-                                                        .primary
-                                                  : null,
+                                      const SizedBox(height: 8),
+                                      Flexible(
+                                        child: SizedBox(
+                                          height: 72,
+                                          child: FittedBox(
+                                            fit: BoxFit.scaleDown,
+                                            child: Text(
+                                              value,
+                                              style: TextStyle(
+                                                fontSize: field == 'Speed'
+                                                    ? 64
+                                                    : 42,
+                                                fontWeight: FontWeight.w600,
+                                                fontFeatures: const [
+                                                  FontFeature.tabularFigures(),
+                                                ],
+                                                color: field == 'Speed'
+                                                    ? Theme.of(context)
+                                                          .colorScheme
+                                                          .primary
+                                                    : null,
+                                              ),
                                             ),
                                           ),
                                         ),
                                       ),
+                                      const SizedBox(height: 4),
                                       Text(
                                         unit,
                                         style: const TextStyle(fontSize: 12),

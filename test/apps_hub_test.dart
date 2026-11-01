@@ -8,7 +8,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(const MaterialApp(home: MoreScreen()));
-    expect(find.text('Apps'), findsOneWidget);
+    expect(find.text('VELO-functies'), findsOneWidget);
     await tester.enterText(find.byType(TextField), 'Sensoren');
     await tester.pumpAndSettle();
     expect(find.widgetWithText(Card, 'Sensoren'), findsOneWidget);

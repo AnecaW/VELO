@@ -98,7 +98,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
       ],
     ),
     body: ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       children: [
         Text(
           'Jouw volgende stap.',
@@ -111,7 +111,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
         const SizedBox(height: 20),
         Card(
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -179,6 +179,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
             ),
           for (final plan in plans)
             Card(
+              margin: const EdgeInsets.only(bottom: 12),
               child: ListTile(
                 title: Text(plan.name),
                 subtitle: Text('${plan.seconds ~/ 60} min · ${plan.goal}'),
@@ -208,6 +209,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
                     '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
                 final scheduled = plans.where((p) => p.scheduled == key);
                 return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
                   child: Column(
                     children: [
                       ListTile(
@@ -254,6 +256,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
                     ),
                   for (final r in rows)
                     Card(
+                      margin: const EdgeInsets.only(bottom: 12),
                       child: ListTile(
                         title: Text(r['name']),
                         subtitle: Text(
@@ -342,7 +345,7 @@ class _TrainingProfileScreenState extends State<TrainingProfileScreen> {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Trainingsprofiel')),
     body: ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       children: [
         choice('Doel', goal, [
           'Conditie',
@@ -552,7 +555,7 @@ class _PlanScreenState extends State<PlanScreen> {
       ],
     ),
     body: ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       children: [
         TextFormField(
           initialValue: plan.name,

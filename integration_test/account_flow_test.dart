@@ -1,5 +1,7 @@
 import 'dart:math';
 
+import 'package:bike_computer/services/accounts/supabase_config.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -13,6 +15,13 @@ void main() {
   testWidgets('real Supabase account flow needs no technical configuration', (
     tester,
   ) async {
+    // Historical test is only valid against a separate autoconfirm test project.
+    if (VeloSupabase.url.contains('pdooxhljbutbsotbjbrt')) {
+      markTestSkipped(
+        'Production SMTP: use real mailbox device audit; no disposable users.',
+      );
+      return;
+    }
     final suffix =
         '${DateTime.now().microsecondsSinceEpoch}-${Random.secure().nextInt(1 << 30)}';
     final email = 'ui-$suffix@example.invalid';
@@ -39,8 +48,10 @@ void main() {
     }
 
     Future<void> openAccount() async {
-      await until(find.byKey(const ValueKey('tab-4')));
-      await tester.tap(find.byKey(const ValueKey('tab-4')));
+      await until(find.byKey(const ValueKey('tab-2')));
+      await tester.tap(find.byKey(const ValueKey('tab-2')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('VELO-functies'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('VELO-account'));
       await tester.pumpAndSettle();
@@ -63,6 +74,10 @@ void main() {
       expect(find.byKey(const ValueKey('backend-url')), findsNothing);
       await tester.tap(find.text('Nieuw account aanmaken'));
       await tester.pump();
+      await tester.enterText(
+        find.byKey(const ValueKey('account-name')),
+        'Test rider',
+      );
       await tester.ensureVisible(find.byKey(const ValueKey('account-email')));
       await tester.enterText(
         find.byKey(const ValueKey('account-email')),
@@ -81,7 +96,7 @@ void main() {
       await tester.ensureVisible(find.byKey(const ValueKey('account-submit')));
       await tester.tap(find.byKey(const ValueKey('account-submit')));
       await signedIn();
-      await until(find.byKey(const ValueKey('tab-4')));
+      await until(find.byKey(const ValueKey('tab-2')));
       expect(Runtime.accounts.user?['email'], email);
       final restored = SupabaseAccountService(
         refreshMutex: Runtime.database.withAccountRefreshLock,
@@ -120,7 +135,7 @@ void main() {
       await tester.ensureVisible(find.byKey(const ValueKey('account-submit')));
       await tester.tap(find.byKey(const ValueKey('account-submit')));
       await signedIn();
-      await until(find.byKey(const ValueKey('tab-4')));
+      await until(find.byKey(const ValueKey('tab-2')));
       expect(Runtime.accounts.user?['email'], email);
       await Runtime.accountSync.run();
       expect(Runtime.accountSync.message, isNull);
