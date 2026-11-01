@@ -1,0 +1,8 @@
+*
+!requirements.txt
+!src/
+!src/**
+!migrations/
+!migrations/**
+**/__pycache__
+**/*.pyc
