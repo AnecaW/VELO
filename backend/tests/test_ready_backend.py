@@ -29,6 +29,16 @@ def test_unicode_route_names_are_supported(setup):
     assert response.status_code==200
 
 
+def test_user_route_names_with_slashes_and_punctuation_round_trip(setup):
+    client,*_=setup
+    path='/api/v1/data/routes/Fietsroute%20A%2FB%3F'
+    response=client.put(path,json={'payload':{'name':'Fietsroute A/B?','points':[[51,4],[51.1,4.1]]}})
+    assert response.status_code==200
+    assert client.get('/api/v1/data/routes').json()['items'][0]['id']=='Fietsroute A/B?'
+    assert client.delete(path,params={'expected_revision':response.json()['revision']}).status_code==200
+    assert client.get('/api/v1/data/routes').json()['items']==[]
+
+
 def test_job_retry_is_owned_and_uncertain_upload_requires_confirmation(setup):
     client,db,*_=setup
     second=other(client);grant(client)

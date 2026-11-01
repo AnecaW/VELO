@@ -79,7 +79,14 @@ class Runtime {
   static IntegrationCoordinator get integrations =>
       _integrations ??= IntegrationCoordinator(
         BackendStravaIntegration(BackendStravaService(database, accounts)),
-        syncAccount: () => accountSync.run(),
+        syncAccount: () async {
+          try {
+            await accounts.flushPendingLogouts();
+          } catch (_) {
+            /* Keep revocations securely queued. */
+          }
+          await accountSync.run();
+        },
       );
   static void configure(BikeComputerDatabase db) {
     _accountSync?.dispose();

@@ -24,6 +24,41 @@ Map<String, dynamic> tokens({int? expiry, String refresh = 'test-refresh'}) => {
   'user': {'id': 'rider', 'email': 'rider@example.test'},
 };
 void main() {
+  test('offline logout clears the active session and securely queues origin-bound revocation', () async {
+    final store = Tokens();
+    var online = true, revocations = 0;
+    final client = MockClient((request) async {
+      if (!online) throw http.ClientException('offline');
+      if (request.url.path.endsWith('/login')) {
+        return http.Response(jsonEncode(tokens()), 200);
+      }
+      revocations++;
+      return http.Response('{}', 200);
+    });
+    final service = AccountService(
+      baseUrl: 'https://velo.example.test',
+      store: store,
+      client: client,
+    );
+    await service.login('rider@example.test', 'test-password-123');
+    online = false;
+    await service.logout();
+    expect(service.state, AccountState.signedOut);
+    expect(service.user, isNull);
+    expect(store.values['velo-session'], isNull);
+    expect(store.values['velo-pending-logout'], isNotNull);
+    final other = AccountService(
+      baseUrl: 'https://other.example.test',
+      store: store,
+      client: client,
+    );
+    online = true;
+    await other.flushPendingLogouts();
+    expect(revocations, 0);
+    await service.flushPendingLogouts();
+    expect(revocations, 1);
+    expect(store.values['velo-pending-logout'], isNull);
+  });
   test(
     'a delayed authenticated reply cannot restore signed-in state after logout',
     () async {

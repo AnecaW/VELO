@@ -63,9 +63,18 @@ class AccountSync extends ChangeNotifier {
     accounts.addListener(_accountChanged);
     _periodic = Timer.periodic(
       const Duration(minutes: 1),
-      (_) => unawaited(run()),
+      (_) => unawaited(_tick()),
     );
     schedule();
+  }
+
+  Future<void> _tick() async {
+    try {
+      await accounts.flushPendingLogouts();
+    } catch (_) {
+      /* Retry next tick. */
+    }
+    await run();
   }
 
   void _accountChanged() {

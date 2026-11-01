@@ -55,7 +55,7 @@ KINDS={'settings','rides','routes','training_plans','profiles','training_profile
 SCOPES={'activity:read','activity:read_all','activity:write','read','read_all'}
 
 def validate_document(kind,id,payload):
-    if kind not in KINDS or not re.fullmatch(r'[\w.: ~-]{1,200}',id) or id.startswith('strava:') or payload.get('source')=='Strava':raise Problem(422,'Ongeldige lokale gegevens of externe API-cache.','invalid_document')
+    if kind not in KINDS or not re.fullmatch(r'[^\x00-\x1f\x7f]{1,512}',id) or id.startswith('strava:') or payload.get('source')=='Strava':raise Problem(422,'Ongeldige lokale gegevens of externe API-cache.','invalid_document')
     try:
         if len(json.dumps(payload,allow_nan=False).encode())>10*1024*1024:raise ValueError()
         if kind=='rides':
@@ -344,7 +344,7 @@ def create_app(settings=None,provider=None):
         with db.connect() as con:rows=con.execute('SELECT * FROM documents WHERE user_id=? AND kind=? AND revision>? ORDER BY revision LIMIT 100',(current['id'],kind,after)).fetchall()
         return {'items':[{'id':r['id'],'payload':db.open(r['payload']),'revision':r['revision'],'updated_at':r['updated_at']} for r in rows],'cursor':rows[-1]['revision'] if rows else after,'has_more':len(rows)==100}
 
-    @app.put('/api/v1/data/{kind}/{id}')
+    @app.put('/api/v1/data/{kind}/{id:path}')
     def put_data(kind:str,id:str,body:Document,current=Depends(user)):
         validate_document(kind,id,body.payload)
         with db.connect(True) as con:
@@ -359,7 +359,7 @@ def create_app(settings=None,provider=None):
             con.execute('DELETE FROM document_tombstones WHERE user_id=? AND kind=? AND id=?',(current['id'],kind,id))
         return {'id':id,'revision':revision,'unchanged':False}
 
-    @app.delete('/api/v1/data/{kind}/{id}')
+    @app.delete('/api/v1/data/{kind}/{id:path}')
     def delete_data(kind:str,id:str,expected_revision:int|None=None,current=Depends(user)):
         if kind not in KINDS:raise Problem(404,'Gegevenstype niet gevonden.','not_found')
         with db.connect(True) as con:

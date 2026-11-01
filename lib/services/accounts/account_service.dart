@@ -94,6 +94,7 @@ class AccountService extends ChangeNotifier {
     } finally {
       initialized = true;
       notifyListeners();
+      unawaited(flushPendingLogouts().catchError((Object _) {}));
     }
   }
 
@@ -284,6 +285,7 @@ class AccountService extends ChangeNotifier {
     bool register = false,
   }) async {
     _authGeneration++;
+    user = null;
     _state(AccountState.signingIn);
     try {
       _tokens = Map<String, dynamic>.from(
@@ -300,6 +302,7 @@ class AccountService extends ChangeNotifier {
       await store.write('velo-session-origin', base);
       initialized = true;
       _state(AccountState.signedIn);
+      unawaited(flushPendingLogouts().catchError((Object _) {}));
     } on AccountFailure catch (e) {
       if (state == AccountState.signingIn) {
         _state(AccountState.authenticationError, e.message);
@@ -315,21 +318,87 @@ class AccountService extends ChangeNotifier {
 
   Future<void> _logout() async {
     _authGeneration++;
-    final refresh = _tokens?['refresh_token'];
+    final stored = await store.read('velo-session');
+    final latest = stored == null ? null : jsonDecode(stored);
+    final refresh = (latest?['user']?['id'] == user?['id'])
+        ? (latest?['refresh_token'] ?? _tokens?['refresh_token'])
+        : (_tokens?['refresh_token']);
+    var deferred = false;
     if (refresh != null) {
-      // Retain credentials when revocation cannot be confirmed; let the user retry.
-      await request(
-        'POST',
-        '/api/v1/accounts/logout',
-        body: {'refresh_token': refresh},
-        authenticated: false,
-      );
+      try {
+        await request(
+          'POST',
+          '/api/v1/accounts/logout',
+          body: {'refresh_token': refresh},
+          authenticated: false,
+        );
+      } on AccountFailure {
+        final pending =
+            jsonDecode(await store.read('velo-pending-logout') ?? '[]') as List;
+        if (!pending.any((row) => row['token'] == refresh)) {
+          pending.add({
+            'origin': base,
+            'token': refresh,
+            'expires': DateTime.now()
+                .add(const Duration(days: 30))
+                .millisecondsSinceEpoch,
+          });
+        }
+        await store.write('velo-pending-logout', jsonEncode(pending));
+        deferred = true;
+      }
     }
     await onIdentityChange?.call(null);
+    _authGeneration++;
     _tokens = null;
     user = null;
     await store.write('velo-session', null);
-    _state(AccountState.signedOut);
+    _state(
+      AccountState.signedOut,
+      deferred
+          ? 'Je bent op dit toestel uitgelogd. Zodra er verbinding is, ronden we dit af.'
+          : null,
+    );
+  }
+
+  /// Revocation-only credentials stay in secure storage, never in the local DB.
+  /// They are not used for login or sent to a different internally configured origin.
+  Future<void> flushPendingLogouts() async {
+    if (await store.read('velo-pending-logout') == null) return;
+    Future<void> flush() async {
+      final pending =
+          jsonDecode(await store.read('velo-pending-logout') ?? '[]') as List;
+      final remaining = <dynamic>[];
+      for (final row in pending) {
+        if ((row['expires'] as num) < DateTime.now().millisecondsSinceEpoch) {
+          continue;
+        }
+        if (row['origin'] != base) {
+          remaining.add(row);
+          continue;
+        }
+        try {
+          await _send('POST', '/api/v1/accounts/logout', {
+            'refresh_token': row['token'],
+          }, null);
+        } catch (_) {
+          remaining.add(row);
+        }
+      }
+      await store.write(
+        'velo-pending-logout',
+        remaining.isEmpty ? null : jsonEncode(remaining),
+      );
+      if (remaining.isEmpty && state == AccountState.signedOut && user == null) {
+        _state(AccountState.signedOut);
+      }
+    }
+
+    if (refreshMutex != null) {
+      await refreshMutex!(flush);
+    } else {
+      await flush();
+    }
   }
 
   Future<void> deleted() async {
