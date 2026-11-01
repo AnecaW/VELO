@@ -49,7 +49,7 @@ def test_navigation_missing_configuration_and_validation(setup):
     assert client.post('/api/v1/navigation/directions',json={'coordinates':[[181,51],[4,51]],'profile':'cycling-road'}).status_code==422
 
 
-def test_navigation_proxy_keeps_credentials_on_server(setup,monkeypatch):
+def test_navigation_proxy_keeps_credentials_on_server(setup,monkeypatch,caplog):
     client,db,*_=setup
     db.settings.ors_api_key='test-only-ors-provider-key'
     calls=[]
@@ -60,7 +60,10 @@ def test_navigation_proxy_keeps_credentials_on_server(setup,monkeypatch):
         assert request.headers['Authorization']=='test-only-ors-provider-key'
         return httpx.Response(200,json={'features':[]})
     monkeypatch.setattr('velo_backend.navigation.httpx.Client',lambda **kwargs:original(transport=httpx.MockTransport(handle),**kwargs))
-    response=client.get('/api/v1/navigation/search?q=Brussels')
+    caplog.set_level('INFO')
+    response=client.get('/api/v1/navigation/search?q=PRIVATE-HOME-ADDRESS')
     assert response.status_code==200 and response.json()=={'features':[]}
     assert 'provider-key' not in response.text
     assert 'api_key' not in str(calls[0].url)
+    assert 'PRIVATE-HOME-ADDRESS' not in caplog.text
+    assert 'test-only-ors-provider-key' not in caplog.text

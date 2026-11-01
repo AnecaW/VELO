@@ -76,6 +76,9 @@ def validate_document(kind,id,payload):
     except (ValueError,TypeError,KeyError,IndexError,AttributeError):raise Problem(422,'Gegevensvalidatie mislukt. Er is niets opgeslagen.','invalid_document') from None
 
 def create_app(settings=None,provider=None):
+    # HTTP client request logs can contain geocoding queries or OAuth details.
+    logging.getLogger('httpx').setLevel(logging.WARNING)
+    logging.getLogger('httpcore').setLevel(logging.WARNING)
     settings=settings or Settings.environment();settings.validate();db=Database(settings)
     strava=provider or Strava(db)
     app=FastAPI(title='VELO Self-Hosted API',version='3.1.0',docs_url=None,redoc_url=None,openapi_url=None)
