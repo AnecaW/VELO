@@ -1,0 +1,96 @@
+# For Portainer environments that forbid all capability overrides for limited users.
+# Image USER 10001 and no-new-privileges remain enforced; verify CapEff=0 after deployment.
+x-backend:
+  image: ${VELO_IMAGE:?Set a published image tag or digest}
+  restart: unless-stopped
+  init: true
+  read_only: true
+  security_opt: &id001
+  - no-new-privileges:true
+  tmpfs: &id002
+  - /tmp:size=32m,mode=1777
+  environment: &id003
+    VELO_DATA_DIR: /data
+    VELO_PUBLIC_URL: ${VELO_PUBLIC_URL:?Set the external HTTPS origin}
+    VELO_ENCRYPTION_KEYS: ${VELO_ENCRYPTION_KEYS:?Generate and securely back up encryption
+      keys}
+    SMTP_HOST: ${SMTP_HOST:-}
+    SMTP_PORT: ${SMTP_PORT:-587}
+    SMTP_SECURITY: ${SMTP_SECURITY:-starttls}
+    SMTP_USERNAME: ${SMTP_USERNAME:-}
+    SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+    SMTP_FROM: ${SMTP_FROM:-}
+    STRAVA_CLIENT_ID: ${STRAVA_CLIENT_ID:-}
+    STRAVA_CLIENT_SECRET: ${STRAVA_CLIENT_SECRET:-}
+  volumes: &id004
+  - data:/data
+  logging: &id005
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: '3'
+services:
+  api:
+    image: ${VELO_IMAGE:?Set a published image tag or digest}
+    restart: unless-stopped
+    init: true
+    read_only: true
+    security_opt: *id001
+    tmpfs: *id002
+    environment: *id003
+    volumes: *id004
+    logging: *id005
+    ports:
+    - ${VELO_BIND_ADDRESS:-127.0.0.1}:${VELO_PORT:-8080}:8000
+  worker:
+    image: ${VELO_IMAGE:?Set a published image tag or digest}
+    restart: unless-stopped
+    init: true
+    read_only: true
+    security_opt: *id001
+    tmpfs: *id002
+    environment: *id003
+    volumes: *id004
+    logging: *id005
+    command:
+    - python
+    - -m
+    - velo_backend.cli
+    - worker
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - import os,time; assert time.time()-os.path.getmtime('/tmp/worker-heartbeat')<120
+      interval: 30s
+      start_period: 60s
+  backup:
+    image: ${VELO_IMAGE:?Set a published image tag or digest}
+    restart: unless-stopped
+    init: true
+    read_only: true
+    security_opt: *id001
+    tmpfs: *id002
+    environment: *id003
+    volumes:
+    - data:/data
+    - backups:/backups
+    logging: *id005
+    command:
+    - python
+    - -m
+    - velo_backend.cli
+    - backup-loop
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - import pathlib,time; assert any(time.time()-p.stat().st_mtime<172800 for p
+        in pathlib.Path('/backups').glob('*.velobackup'))
+      interval: 1h
+      start_period: 2m
+volumes:
+  data: null
+  backups: null
