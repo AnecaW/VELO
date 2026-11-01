@@ -1,7 +1,7 @@
 name: bike_computer
 description: VELO cycling computer with offline recording, maps and personal cloud sync.
 publish_to: 'none'
-version: 2.5.0+7
+version: 2.6.0+8
 
 environment:
   sdk: '>=3.13.0 <4.0.0'

@@ -49,16 +49,22 @@ class MbTilesProvider extends TileProvider {
 class RouteMap extends StatefulWidget {
   final NavRoute? route;
   final LatLng? position;
+  final LatLng? destination;
+  final ValueChanged<LatLng>? onTap;
   final bool online;
   final double heading;
+  final bool followPosition;
   final String? offlinePath;
   final ValueChanged<LatLng>? onLongPress;
   const RouteMap({
     super.key,
     this.route,
     this.position,
+    this.destination,
+    this.onTap,
     this.online = false,
     this.heading = 0,
+    this.followPosition = false,
     this.offlinePath,
     this.onLongPress,
   });
@@ -93,6 +99,11 @@ class _RouteMapState extends State<RouteMap> {
             widget.offlinePath == null)) {
       return;
     }
+    if (widget.followPosition && !old.followPosition) follow = true;
+    if (old.destination != widget.destination && widget.destination != null) {
+      follow = false;
+      controller.move(widget.destination!, 15);
+    }
     if (headingMode) controller.rotate(-widget.heading);
     if (widget.route != old.route &&
         widget.route != null &&
@@ -120,8 +131,11 @@ class _RouteMapState extends State<RouteMap> {
           '${Runtime.settings.value('mapStyle', 'dark')}-${Runtime.settings.value('mapOffline', false)}-${Runtime.settings.value<Map<String, dynamic>?>('offlineView', null)?['id']}',
         ),
         route: widget.route,
+        destination: widget.destination,
+        onTap: widget.onTap,
         position: widget.position,
         heading: widget.heading,
+        followPosition: widget.followPosition,
         onLongPress: widget.onLongPress,
       );
     }
@@ -152,6 +166,7 @@ class _RouteMapState extends State<RouteMap> {
               if (gesture) follow = false;
               if (mounted) setState(() {});
             },
+            onTap: (_, point) => widget.onTap?.call(point),
             onLongPress: (_, point) => widget.onLongPress?.call(point),
           ),
           children: [
@@ -203,6 +218,15 @@ class _RouteMapState extends State<RouteMap> {
                       Icons.flag,
                       color: Colors.orange,
                       size: 32,
+                    ),
+                  ),
+                if (widget.destination != null)
+                  Marker(
+                    point: widget.destination!,
+                    child: const Icon(
+                      Icons.place,
+                      color: Colors.orange,
+                      size: 36,
                     ),
                   ),
                 if (widget.position != null)

@@ -1,3 +1,5 @@
+import '../../models/bike_type.dart';
+
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -67,6 +69,11 @@ class RideRecordingService {
     _lastTick = null;
     _previous = null;
     _emit();
+  }
+
+  void setBikeType(BikeType type) {
+    _require(_currentSession.state == RideState.ready);
+    _currentSession = _currentSession.copyWith(bikeType: type);
   }
 
   Future<void> startRecording() async {

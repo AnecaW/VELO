@@ -26,11 +26,17 @@ class NavStep {
 
 class NavRoute {
   final String name;
+  final double? durationSeconds, ascent;
+  final String? provider, bikeType;
   final List<NavPoint> points, waypoints;
   final List<NavStep> steps;
   const NavRoute(
     this.name,
     this.points, {
+    this.durationSeconds,
+    this.ascent,
+    this.provider,
+    this.bikeType,
     this.waypoints = const [],
     this.steps = const [],
   });
@@ -52,6 +58,10 @@ class NavRoute {
 
   String encode() => jsonEncode({
     'name': name,
+    'duration': durationSeconds,
+    'ascent': ascent,
+    'provider': provider,
+    'bikeType': bikeType,
     'points': points.map((p) => p.toJson()).toList(),
     'waypoints': waypoints.map((p) => p.toJson()).toList(),
     'steps': steps.map((s) => [s.index, s.instruction]).toList(),
@@ -67,6 +77,10 @@ class NavRoute {
     return NavRoute(
       j['name'],
       (j['points'] as List).map(point).toList(),
+      durationSeconds: (j['duration'] as num?)?.toDouble(),
+      ascent: (j['ascent'] as num?)?.toDouble(),
+      provider: j['provider'],
+      bikeType: j['bikeType'],
       waypoints: (j['waypoints'] as List).map(point).toList(),
       steps: (j['steps'] as List).map((s) => NavStep(s[0], s[1])).toList(),
     );

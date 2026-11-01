@@ -1,3 +1,5 @@
+import '../../models/bike_type.dart';
+
 import 'dart:async';
 import 'dart:convert';
 
@@ -155,6 +157,9 @@ class RideController extends ChangeNotifier {
       _checkpoint = null;
     }
     if (session.state == RideState.ready) {
+      service.setBikeType(
+        BikeType.parse(settings.value<String?>('bikeType', null)),
+      );
       final raw = await database.getDocument('profiles', 'all');
       if (raw != null) {
         final p = (jsonDecode(raw) as List)
@@ -186,6 +191,7 @@ class RideController extends ChangeNotifier {
     _events?.cancel();
     _warnings?.cancel();
     _service?.dispose();
+    gps?.stopListening();
     if (gps is RealGPSService) (gps as RealGPSService).dispose();
     if (gps is MockGPSService) (gps as MockGPSService).dispose();
     super.dispose();

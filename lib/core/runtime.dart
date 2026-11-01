@@ -1,3 +1,6 @@
+import '../services/gps/shared_location.dart';
+import '../services/gps/gps_service.dart';
+
 import 'package:bike_computer/services/integrations/strava_integration.dart';
 import 'package:bike_computer/services/accounts/account_service.dart';
 import 'package:bike_computer/services/accounts/supabase_account_service.dart';
@@ -14,6 +17,14 @@ import 'package:bike_computer/core/settings.dart';
 import 'package:bike_computer/services/bluetooth/ble_sensor_manager.dart';
 
 class Runtime {
+  static final location = LocationHub(
+    RealGPSService(
+      recording: true,
+      notificationTitle: 'VELO · rit en navigatie',
+      intervalProvider: () => settings.value('gpsInterval', 2),
+      accuracyProvider: () => settings.value('highAccuracy', true),
+    ),
+  );
   static final AccountService accounts = SupabaseAccountService(
     onLegacyIdentity: (previous, owner) =>
         accountSync.importLegacyArchive(previous, owner),
@@ -75,8 +86,12 @@ class Runtime {
   static WorkoutRunner get workout =>
       _runner ??= WorkoutRunner(TrainingStore(database), sensors);
   static RideController? _ride;
-  static RideController get ride =>
-      _ride ??= RideController(database, settings, sensors);
+  static RideController get ride => _ride ??= RideController(
+    database,
+    settings,
+    sensors,
+    injectedGps: location.lease(),
+  );
   static String? lastError;
   static IntegrationCoordinator? _integrations;
   static IntegrationCoordinator get integrations =>

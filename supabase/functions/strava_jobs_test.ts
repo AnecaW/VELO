@@ -1,5 +1,12 @@
 import { accessToken, now, seal, strava, unseal } from "./_shared/core.ts";
-import { enqueue, gpx, synchronize, upload, webhook } from "./_shared/jobs.ts";
+import {
+  enqueue,
+  gpx,
+  stravaSportType,
+  synchronize,
+  upload,
+  webhook,
+} from "./_shared/jobs.ts";
 import { handle as receive } from "./velo-webhook/index.ts";
 function assert(value: unknown, message = "Assertion failed"): asserts value {
   if (!value) throw new Error(message);
@@ -111,13 +118,17 @@ Deno.test("manual upload works with automatic disabled and resumes by upload ID,
       posts++;
       assert(init?.body instanceof FormData);
       assert(String(init.body.get("external_id")).startsWith("velo-"));
+      assert(init.body.get("sport_type") === "GravelRide");
+      assert(!init.body.has("type"));
       return reply({ id: 101 }, 201);
     }
     if (url === "https://www.strava.com/api/v3/uploads/101") {
       return reply({ id: 101, activity_id: 202 });
     }
     if (url.includes("/rest/v1/velo_documents")) {
-      return reply({ payload: { id: "ride", name: "Fixture ride" } });
+      return reply({
+        payload: { id: "ride", name: "Fixture ride", bikeType: "gravel" },
+      });
     }
     if (url.includes("/rest/v1/velo_tracks")) {
       return reply({
@@ -512,4 +523,30 @@ Deno.test("webhook never acknowledges a failed durable enqueue as success", asyn
     await Promise.allSettled(tasks);
     globalThis.fetch = original;
   }
+});
+
+Deno.test("all bike profiles use official upload sport_type values with safe legacy fallback", () => {
+  const expected = {
+    road: "Ride",
+    mountain: "MountainBikeRide",
+    gravel: "GravelRide",
+    electric: "EBikeRide",
+    electricMountain: "EMountainBikeRide",
+    city: "Ride",
+    trekking: "Ride",
+    other: "Ride",
+  };
+  for (const [bike, sport] of Object.entries(expected)) {
+    assert(stravaSportType(bike) === sport);
+  }
+  for (
+    const invalid of [
+      undefined,
+      null,
+      "constructor",
+      "__proto__",
+      {},
+      "unknown",
+    ]
+  ) assert(stravaSportType(invalid) === "Ride");
 });

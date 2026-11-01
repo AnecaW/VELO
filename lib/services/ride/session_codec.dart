@@ -1,3 +1,5 @@
+import '../../models/bike_type.dart';
+
 import 'dart:convert';
 
 import 'package:bike_computer/models/ride_session.dart';
@@ -7,6 +9,8 @@ import 'package:bike_computer/models/gps_models.dart';
 class SessionCodec {
   static String encode(RideSession s) => jsonEncode({
     'v': 1,
+    'bikeType': s.bikeType.name,
+    'sport_type': s.bikeType.sportType,
     'id': s.id,
     'state': s.state.name,
     'start': s.startTime?.toIso8601String(),
@@ -52,6 +56,7 @@ class SessionCodec {
     double? optional(String k) => (j[k] as num?)?.toDouble();
     return RideSession(
       id: j['id'],
+      bikeType: BikeType.parse(j['bikeType']),
       state: RideState.values.byName(j['state']),
       startTime: DateTime.tryParse(j['start'] ?? ''),
       endTime: DateTime.tryParse(j['end'] ?? ''),

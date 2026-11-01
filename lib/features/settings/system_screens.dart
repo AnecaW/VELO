@@ -66,7 +66,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
         : Runtime.settings.value('onlineMap', false)
         ? 'Online OSM (geen beschikbaarheidstest)'
         : 'Lokaal routespoor';
-    data['routing'] = 'openrouteservice · vereist sleutel en netwerk';
+    data['routing'] = 'BRouter · fietstypeprofielen · internet vereist';
     if (mounted) setState(() => report = data);
   }
 

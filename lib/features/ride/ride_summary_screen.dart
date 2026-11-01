@@ -1,3 +1,4 @@
+import '../../widgets/bike_type_selector.dart';
 import '../integrations/strava_upload_card.dart';
 
 import 'dart:convert';
@@ -63,6 +64,7 @@ class _RideSummaryScreenState extends State<RideSummaryScreen> {
                     );
                   },
                 ),
+              BikeTypeSelector(fixed: widget.session.bikeType),
               _buildSummaryCard(context),
               const SizedBox(height: 24),
 

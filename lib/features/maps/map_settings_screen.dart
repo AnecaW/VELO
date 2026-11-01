@@ -8,7 +8,7 @@ import 'package:bike_computer/core/runtime.dart';
 import 'package:bike_computer/services/navigation/map_provider.dart';
 import 'package:bike_computer/services/navigation/offline_maps.dart';
 import 'package:bike_computer/services/navigation/gpx_route.dart';
-import 'package:bike_computer/services/navigation/routing_client.dart';
+import 'package:bike_computer/services/navigation/geocoding_service.dart';
 import 'package:bike_computer/widgets/vector_route_map.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -304,10 +304,9 @@ class _OfflineMapsScreenState extends State<OfflineMapsScreen> {
     );
     query.dispose();
     if (text == null) return;
-    final client = RoutingClient(accounts: Runtime.accounts);
+    final client = PhotonGeocoder(Runtime.database);
     try {
-      const key = ''; // Credentials are managed by VELO, never by the rider.
-      final results = await client.search(text, key);
+      final results = await client.search(text);
       if (!mounted) return;
       final selected = await showDialog<NavPoint>(
         context: context,

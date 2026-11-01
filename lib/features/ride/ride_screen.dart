@@ -1,3 +1,5 @@
+import '../../widgets/bike_type_selector.dart';
+
 import 'package:bike_computer/services/recording/ride_controller.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -457,6 +459,16 @@ class _RideScreenState extends State<RideScreen> {
           child: Column(
             children: [
               if (busy) const LinearProgressIndicator(),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: BikeTypeSelector(
+                  fixed:
+                      session.startTime == null ||
+                          session.state == RideState.saved
+                      ? null
+                      : session.bikeType,
+                ),
+              ),
               Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,

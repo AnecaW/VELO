@@ -4,7 +4,7 @@ Android-fietscomputer met ritregistratie, offline kaarten, sensoren, navigatie, 
 
 ## Gebruiken
 
-1. Download de [Supabase-versie voor Android](https://github.com/AnecaW/VELO/releases/tag/android-supabase-v2.5.0) en installeer `velo-supabase.apk`.
+1. Download de [Supabase-versie voor Android](https://github.com/AnecaW/VELO/releases/tag/android-supabase-v2.6.0) en installeer `velo-supabase.apk`.
 2. Maak een nieuw VELO-account aan, bevestig je e-mail en log in. Lees je de mail op een ander toestel? Vul dan de mailcode in VELO in.
 3. Begin met fietsen. Eigen ritten, routes, profielen, trainingsplannen en instellingen synchroniseren automatisch.
 
@@ -17,10 +17,10 @@ De centrale Apps-knop toont echte te openen Android-apps met hun eigen iconen. I
 - Flutter met de officiële `supabase_flutter` SDK, Android secure storage en bestaande lokale Drift/SQLite-opslag.
 - Supabase Auth voor registratie met naam en e-mailbevestiging, login, sessieherstel, wachtwoordbeheer en uitloggen.
 - PostgreSQL met RLS op alle gebruikerstabellen, accountisolatie, revisiecontrole en incrementele synchronisatie.
-- Edge Functions voor serversecrets, providerintegraties, navigatieproxy en accountverwijdering.
+- Edge Functions voor serversecrets, providerintegraties en accountverwijdering (de bestaande ORS-proxy blijft voor compatibiliteit).
 - Supabase Cron/Vault voor periodiek werk. Geen eigen server, Docker, Portainer of eigen domein nodig.
 
-Strava is verbonden via de officiële OAuth-flow, met echte activiteitimport, GPX-uploads, webhooks en veilige tokenvernieuwing. Zie [Strava-resultaten](docs/STRAVA_RESULTS.md). Online routeplanning mist nog een OpenRouteService-key. Supabase SMTP, e-mailbevestiging en wachtwoordherstel zijn ingeschakeld en met de echte eigenaar getest. De app bevat geen SMTP-secrets.
+Strava is verbonden via de officiële OAuth-flow, met echte activiteitimport, GPX-uploads, webhooks en veilige tokenvernieuwing. Zie [Strava-resultaten](docs/STRAVA_RESULTS.md). Adresautocomplete en fietsspecifieke routeplanning werken via Photon en BRouter, zonder API-key. Zie [Fietstypes en navigatie](docs/CYCLING_NAVIGATION.md). Supabase SMTP, e-mailbevestiging en wachtwoordherstel zijn ingeschakeld en met de echte eigenaar getest. De app bevat geen SMTP-secrets.
 
 ## Project
 

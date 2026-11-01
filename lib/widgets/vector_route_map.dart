@@ -10,13 +10,19 @@ import 'package:bike_computer/services/navigation/map_provider.dart';
 class VectorRouteMap extends StatefulWidget {
   final NavRoute? route;
   final LatLng? position;
+  final LatLng? destination;
+  final ValueChanged<LatLng>? onTap;
   final double heading;
+  final bool followPosition;
   final ValueChanged<LatLng>? onLongPress;
   const VectorRouteMap({
     super.key,
     this.route,
     this.position,
+    this.destination,
+    this.onTap,
     this.heading = 0,
+    this.followPosition = false,
     this.onLongPress,
   });
   @override
@@ -34,7 +40,10 @@ class _VectorRouteMapState extends State<VectorRouteMap> {
   ml.Circle? location;
   String? style;
   String get selected {
-    final id = Runtime.settings.value('mapStyle', 'dark');
+    final id = Runtime.settings.value(
+      'mapStyle',
+      Theme.of(context).brightness == Brightness.dark ? 'dark' : 'light',
+    );
     return id == 'custom'
         ? Runtime.settings.value('customStyle', '')
         : MapStyleSpec.builtins
@@ -59,7 +68,28 @@ class _VectorRouteMapState extends State<VectorRouteMap> {
   @override
   void didUpdateWidget(covariant VectorRouteMap old) {
     super.didUpdateWidget(old);
-    if (old.route != widget.route) _draw();
+    if (old.route != widget.route && !widget.followPosition) follow = false;
+    if (old.route != widget.route || old.destination != widget.destination) {
+      _draw();
+    }
+    if (old.destination != widget.destination &&
+        widget.destination != null &&
+        ready) {
+      follow = false;
+      controller?.animateCamera(
+        ml.CameraUpdate.newLatLngZoom(
+          ml.LatLng(
+            widget.destination!.latitude,
+            widget.destination!.longitude,
+          ),
+          15,
+        ),
+      );
+    }
+    if (widget.followPosition && !old.followPosition) {
+      follow = true;
+      _position();
+    }
     if (old.position != widget.position) _position();
   }
 
@@ -117,7 +147,7 @@ class _VectorRouteMapState extends State<VectorRouteMap> {
             ),
           );
         }
-        if (widget.position == null) {
+        if (!widget.followPosition) {
           await controller!.animateCamera(
             ml.CameraUpdate.newLatLngBounds(
               ml.LatLngBounds(
@@ -137,6 +167,20 @@ class _VectorRouteMapState extends State<VectorRouteMap> {
             ),
           );
         }
+      }
+      if (widget.destination != null) {
+        await controller!.addCircle(
+          ml.CircleOptions(
+            geometry: ml.LatLng(
+              widget.destination!.latitude,
+              widget.destination!.longitude,
+            ),
+            circleColor: '#ffb454',
+            circleRadius: 9,
+            circleStrokeWidth: 3,
+            circleStrokeColor: '#ffffff',
+          ),
+        );
       }
       await _position();
     } catch (e) {
@@ -252,6 +296,8 @@ class _VectorRouteMapState extends State<VectorRouteMap> {
                 _draw();
               }
             },
+            onMapClick: (_, p) =>
+                widget.onTap?.call(LatLng(p.latitude, p.longitude)),
             onMapLongClick: (_, p) =>
                 widget.onLongPress?.call(LatLng(p.latitude, p.longitude)),
             onCameraTrackingDismissed: () => follow = false,

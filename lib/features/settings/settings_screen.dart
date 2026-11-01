@@ -1,3 +1,5 @@
+import '../../widgets/bike_type_selector.dart';
+
 import 'package:bike_computer/features/profiles/profiles_screen.dart';
 
 import '../accounts/account_screen.dart';
@@ -359,33 +361,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _switch(
                       'Automatisch herberekenen',
                       'reroute',
-                      false,
+                      true,
                       update,
                     ),
                     _switch('Gesproken aanwijzingen', 'voice', false, update),
-                    const Text('Routeringprofiel (provider ondersteund)'),
-                    DropdownButton<String>(
-                      value: Runtime.settings.value(
-                        'routingProfile',
-                        'cycling-regular',
-                      ),
-                      isExpanded: true,
-                      items: [
-                        for (final p in [
-                          'cycling-regular',
-                          'cycling-road',
-                          'cycling-mountain',
-                          'cycling-electric',
-                        ])
-                          DropdownMenuItem(value: p, child: Text(p)),
-                      ],
-                      onChanged: (v) async {
-                        await _set('routingProfile', v);
-                        update(() {});
-                      },
-                    ),
                     const Text(
-                      'GPX-begeleiding werkt offline. Voor nieuwe routes en herberekening heb je verbinding met VELO nodig.',
+                      'BRouter kiest het routeprofiel bij je fietstype',
+                    ),
+                    const BikeTypeSelector(),
+                    const Text(
+                      'Opgeslagen routes volgen werkt offline. Photon zoekt adressen; BRouter berekent nieuwe routes via internet. Publieke diensten kunnen tijdelijk niet beschikbaar zijn.',
                     ),
                   ],
                 ),

@@ -15,6 +15,23 @@ const escape = (s: unknown) =>
     '"',
     "&quot;",
   );
+// Official upload sport_type; never trust a caller-supplied legacy `type`.
+export function stravaSportType(bikeType: unknown): string {
+  const sports: Record<string, string> = {
+    road: "Ride",
+    mountain: "MountainBikeRide",
+    gravel: "GravelRide",
+    electric: "EBikeRide",
+    electricMountain: "EMountainBikeRide",
+    city: "Ride",
+    trekking: "Ride",
+    other: "Ride",
+  };
+  return typeof bikeType === "string" && Object.hasOwn(sports, bikeType)
+    ? sports[bikeType]
+    : "Ride";
+}
+
 export function gpx(payload: Record<string, unknown>) {
   const points = payload.points as unknown[][];
   if (!Array.isArray(points) || points.length < 2) {
@@ -318,7 +335,7 @@ export async function upload(job: Record<string, any>) {
     );
     form.set("data_type", "gpx");
     form.set("external_id", externalId);
-    form.set("sport_type", "Ride");
+    form.set("sport_type", stravaSportType(doc.payload.bikeType));
     const response = await strava(job.user_id, "uploads", {
       method: "POST",
       body: form,

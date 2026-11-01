@@ -124,7 +124,13 @@ class RealGPSService implements GPSService {
   final bool highAccuracy;
   final Duration retryDelay;
   final bool recording;
+  final int Function()? intervalProvider;
+  final bool Function()? accuracyProvider;
+  final String? notificationTitle;
   RealGPSService({
+    this.intervalProvider,
+    this.accuracyProvider,
+    this.notificationTitle,
     this.intervalSeconds = 2,
     this.highAccuracy = true,
     this.recording = false,
@@ -167,15 +173,19 @@ class RealGPSService implements GPSService {
           locationSettings: Platform.isAndroid
               ? AndroidSettings(
                   useMSLAltitude: false,
-                  accuracy: highAccuracy
+                  accuracy: (accuracyProvider?.call() ?? highAccuracy)
                       ? LocationAccuracy.best
                       : LocationAccuracy.medium,
                   distanceFilter: 0,
-                  intervalDuration: Duration(seconds: intervalSeconds),
+                  intervalDuration: Duration(
+                    seconds: intervalProvider?.call() ?? intervalSeconds,
+                  ),
                   foregroundNotificationConfig: ForegroundNotificationConfig(
-                    notificationTitle: recording
-                        ? 'VELO · ritregistratie'
-                        : 'VELO · locatie',
+                    notificationTitle:
+                        notificationTitle ??
+                        (recording
+                            ? 'VELO · ritregistratie'
+                            : 'VELO · locatie'),
                     notificationText:
                         'Locatie actief · open VELO om te pauzeren of stoppen',
                     enableWakeLock: true,

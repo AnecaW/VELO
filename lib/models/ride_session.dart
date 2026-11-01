@@ -1,3 +1,5 @@
+import 'bike_type.dart';
+
 import 'package:equatable/equatable.dart';
 import 'package:bike_computer/models/gps_models.dart';
 import 'package:bike_computer/models/ride_models.dart';
@@ -17,6 +19,7 @@ enum RideState {
 
 /// Represents the current state of a ride recording session
 class RideSession extends Equatable {
+  final BikeType bikeType;
   final String? id; // Database ID, null until saved
   final RideState state;
   final DateTime? startTime;
@@ -60,6 +63,7 @@ class RideSession extends Equatable {
   final double? averageGpsAccuracy;
 
   const RideSession({
+    this.bikeType = BikeType.road,
     this.id,
     required this.state,
     this.startTime,
@@ -99,6 +103,7 @@ class RideSession extends Equatable {
 
   /// Create a copy with modified fields
   RideSession copyWith({
+    BikeType? bikeType,
     bool clearSensors = false,
     bool clearHeartRate = false,
     bool clearCadence = false,
@@ -134,6 +139,7 @@ class RideSession extends Equatable {
     double? averageGpsAccuracy,
   }) {
     return RideSession(
+      bikeType: bikeType ?? this.bikeType,
       id: id ?? this.id,
       state: state ?? this.state,
       startTime: startTime ?? this.startTime,
@@ -197,6 +203,7 @@ class RideSession extends Equatable {
   @override
   List<Object?> get props => [
     id,
+    bikeType,
     state,
     startTime,
     endTime,
