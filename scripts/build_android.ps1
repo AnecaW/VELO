@@ -7,10 +7,8 @@ $veloValues = Get-Content -LiteralPath $veloConfig -Raw | ConvertFrom-Json
 $veloUri = [Uri]$veloValues.VELO_BACKEND_URL
 if ($veloUri.UserInfo -or $veloUri.Query -or $veloUri.Fragment -or $veloUri.AbsolutePath -ne '/') { throw 'Use an origin without credentials or path.' }
 if ($Mode -eq 'production' -and ($veloUri.Scheme -ne 'https' -or $veloUri.Host.EndsWith('.example.com') -or $veloUri.Host.EndsWith('.test') -or $veloValues.VELO_LAN_MODE -eq 'true')) { throw 'Production requires a real HTTPS origin and LAN mode disabled.' }
-$veloPreviousLan = $env:ORG_GRADLE_PROJECT_veloLan
 Push-Location $veloRoot
 try {
-    $env:ORG_GRADLE_PROJECT_veloLan = if ($Mode -eq 'lan') { 'true' } else { 'false' }
     flutter pub get
     if ($LASTEXITCODE -ne 0) { throw 'Dependency resolution failed.' }
     flutter build apk --release "--dart-define-from-file=$veloConfig"
@@ -18,6 +16,5 @@ try {
     New-Item -ItemType Directory -Force -Path (Join-Path $veloRoot 'dist') | Out-Null
     Copy-Item -LiteralPath (Join-Path $veloRoot 'build/app/outputs/flutter-apk/app-release.apk') -Destination (Join-Path $veloRoot "dist/velo-$Mode.apk")
 } finally {
-    $env:ORG_GRADLE_PROJECT_veloLan = $veloPreviousLan
     Pop-Location
 }
