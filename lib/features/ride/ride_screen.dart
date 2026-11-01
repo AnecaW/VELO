@@ -1,6 +1,7 @@
 import 'package:bike_computer/services/recording/ride_controller.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bike_computer/core/runtime.dart';
 import 'package:bike_computer/core/platform_bridge.dart';
@@ -99,6 +100,30 @@ class _RideScreenState extends State<RideScreen> {
   }
 
   Future<void> _start() async {
+    if (!simulation &&
+        await Geolocator.checkPermission() == LocationPermission.denied &&
+        mounted) {
+      final allow = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Je rit vastleggen'),
+          content: const Text(
+            'VELO gebruikt je locatie voor snelheid, afstand en je GPS-spoor. Tijdens een rit blijft de opname actief wanneer het scherm uit staat. Je rit wordt eerst op dit toestel bewaard.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Niet nu'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Doorgaan'),
+            ),
+          ],
+        ),
+      );
+      if (allow != true) return;
+    }
     if (Runtime.settings.value('nightRide', false)) {
       await Runtime.settings.set('theme', 'oled');
     }
@@ -209,7 +234,7 @@ class _RideScreenState extends State<RideScreen> {
                       for (var i = 0; i < fields.length; i++)
                         ListTile(
                           key: ValueKey('$i-${fields[i]}'),
-                          title: Text(fields[i]),
+                          title: Text(_label(fields[i])),
                           leading: const Icon(Icons.drag_handle),
                           trailing: IconButton(
                             onPressed: () => update(() => fields.removeAt(i)),
@@ -234,12 +259,17 @@ class _RideScreenState extends State<RideScreen> {
                       'Climb',
                       'Altitude',
                       'Grade',
+                      'Descent',
+                      'Heading',
+                      'GPS accuracy',
+                      'Latitude',
+                      'Longitude',
                     ])
                       TextButton(
                         onPressed: fields.contains(f)
                             ? null
                             : () => update(() => fields.add(f)),
-                        child: Text(f),
+                        child: Text(_label(f)),
                       ),
                   ],
                 ),
@@ -251,6 +281,35 @@ class _RideScreenState extends State<RideScreen> {
     );
   }
 
+  String _label(String field) =>
+      const {
+        'Speed': 'Snelheid',
+        'Distance': 'Afstand',
+        'Moving time': 'Rijtijd',
+        'Elapsed': 'Verstreken',
+        'Average': 'Gemiddelde',
+        'Max speed': 'Maximum',
+        'Heart rate': 'Hartslag',
+        'Cadence': 'Cadans',
+        'Power': 'Vermogen',
+        'Climb': 'Stijging',
+        'Altitude': 'Hoogte',
+        'Grade': 'Helling',
+        'Descent': 'Daling',
+        'Heading': 'Richting',
+        'GPS accuracy': 'GPS-nauwkeurigheid',
+        'Latitude': 'Breedtegraad',
+        'Longitude': 'Lengtegraad',
+      }[field] ??
+      field;
+  String get _status => switch (session.state) {
+    RideState.recording => 'Rit bezig',
+    RideState.paused => 'Gepauzeerd',
+    RideState.finished => 'Rit beëindigd',
+    RideState.saved => 'Rit opgeslagen',
+    RideState.stopping => 'Rit opslaan',
+    _ => 'Fietscomputer',
+  };
   String _duration(Duration d) =>
       '${d.inHours.toString().padLeft(2, '0')}:${d.inMinutes.remainder(60).toString().padLeft(2, '0')}:${d.inSeconds.remainder(60).toString().padLeft(2, '0')}';
   (String, String) _metric(String field) {
@@ -258,6 +317,35 @@ class _RideScreenState extends State<RideScreen> {
     final factor = imperial ? 0.621371 : 1.0;
     final fresh = session.currentGpsAccuracy != null;
     switch (field) {
+      case 'GPS accuracy':
+        return (session.currentGpsAccuracy?.toStringAsFixed(0) ?? '—', 'm');
+      case 'Heading':
+        return (
+          fresh && session.trackPoints.isNotEmpty
+              ? session.trackPoints.last.heading?.toStringAsFixed(0) ?? '—'
+              : '—',
+          '°',
+        );
+      case 'Latitude':
+        return (
+          fresh && session.trackPoints.isNotEmpty
+              ? session.trackPoints.last.latitude.toStringAsFixed(5)
+              : '—',
+          '° N',
+        );
+      case 'Longitude':
+        return (
+          fresh && session.trackPoints.isNotEmpty
+              ? session.trackPoints.last.longitude.toStringAsFixed(5)
+              : '—',
+          '° E',
+        );
+      case 'Descent':
+        return (
+          (session.totalElevationLoss * (imperial ? 3.28084 : 1))
+              .toStringAsFixed(0),
+          imperial ? 'ft' : 'm',
+        );
       case 'Speed':
         return (
           fresh ? (session.currentSpeed * factor).toStringAsFixed(1) : '—',
@@ -330,9 +418,10 @@ class _RideScreenState extends State<RideScreen> {
         session.state == RideState.recording ||
         session.state == RideState.paused ||
         session.state == RideState.finished;
-    final fields = Runtime.settings.value('minimalRide', false)
+    var fields = Runtime.settings.value('minimalRide', false)
         ? ['Speed', 'Distance', 'Elapsed']
         : Runtime.settings.fields(profile);
+    if (fields.isEmpty) fields = ['Speed', 'Distance', 'Elapsed'];
     final screen = MediaQuery.sizeOf(context);
     final pageSize = screen.width > screen.height
         ? (screen.width > 700 ? 3 : 2)
@@ -348,7 +437,7 @@ class _RideScreenState extends State<RideScreen> {
           title: Text(
             simulation
                 ? 'SIMULATIE · ${session.state.name.toUpperCase()}'
-                : session.state.name.toUpperCase(),
+                : _status,
           ),
           actions: [
             IconButton(
@@ -426,7 +515,7 @@ class _RideScreenState extends State<RideScreen> {
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Text(
-                                        field.toUpperCase(),
+                                        _label(field).toUpperCase(),
                                         style: const TextStyle(
                                           fontSize: 11,
                                           letterSpacing: 1.5,

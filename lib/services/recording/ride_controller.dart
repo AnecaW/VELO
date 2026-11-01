@@ -48,6 +48,7 @@ class RideController extends ChangeNotifier {
         (simulate && kDebugMode
             ? MockGPSService()
             : RealGPSService(
+                recording: true,
                 intervalSeconds: settings.value('gpsInterval', 2),
                 highAccuracy: settings.value('highAccuracy', true),
               ));

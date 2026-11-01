@@ -1,3 +1,5 @@
+> Historisch: dit beschrijft de vorige self-hosted installatie. De actieve app gebruikt nu [Supabase](SUPABASE.md); deze oude instructies zijn niet nodig voor gebruik.
+
 # VELO: werkelijk uitgevoerde installatie
 
 Gecontroleerd op 1 november 2026. Repository: https://github.com/AnecaW/VELO.

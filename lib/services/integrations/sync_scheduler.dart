@@ -1,4 +1,4 @@
-import '../accounts/account_service.dart';
+import '../accounts/supabase_account_service.dart';
 import '../accounts/account_sync.dart';
 import 'backend_strava.dart';
 
@@ -19,7 +19,10 @@ import 'sync_engine.dart';
 void integrationBackgroundDispatcher() {
   Workmanager().executeTask((task, input) async {
     final db = BikeComputerDatabase();
-    final accounts = AccountService(refreshMutex: db.withAccountRefreshLock);
+    final accounts = SupabaseAccountService(
+      background: true,
+      refreshMutex: db.withAccountRefreshLock,
+    );
     await accounts.restore();
     final strava = BackendStravaService(db, accounts);
     final engine = SyncEngine(
@@ -33,10 +36,13 @@ void integrationBackgroundDispatcher() {
       } finally {
         accountSync.dispose();
       }
+      if (task == 'account-sync') return true;
+      await strava.flushOutbox();
       await (engine.provider as StravaIntegration).cache.expire();
       if (task == 'strava-cleanup') return true;
       return await engine.run(trigger: 'background');
     } finally {
+      accounts.dispose();
       strava.dispose();
       engine.dispose();
       await db.close();
@@ -64,15 +70,17 @@ class IntegrationCoordinator with WidgetsBindingObserver {
     if (initial != null) await handleLink(initial);
     _network = Connectivity().onConnectivityChanged.listen((_) {
       unawaited(syncAccount?.call() ?? Future.value());
+      unawaited(_flushOutbox());
       unawaited(engine.run(trigger: 'network'));
     });
-    _cleanup = Timer.periodic(
-      const Duration(minutes: 1),
-      (_) => strava.cache.expire(),
-    );
+    _cleanup = Timer.periodic(const Duration(minutes: 1), (_) {
+      strava.cache.expire();
+      unawaited(_flushOutbox());
+    });
     await strava.cache.expire();
     await Workmanager().initialize(integrationBackgroundDispatcher);
     await schedule();
+    unawaited(_flushOutbox());
     unawaited(engine.run(trigger: 'open'));
   }
 
@@ -93,6 +101,7 @@ class IntegrationCoordinator with WidgetsBindingObserver {
         'next': null,
       });
       await schedule();
+      unawaited(_flushOutbox());
       unawaited(engine.run(trigger: 'open'));
     } catch (e) {
       oauthMessage = e is IntegrationFailure
@@ -107,6 +116,17 @@ class IntegrationCoordinator with WidgetsBindingObserver {
 
   Future<void> schedule() async {
     if (!Platform.isAndroid) return;
+    await Workmanager().registerPeriodicTask(
+      'velo-account-sync',
+      'account-sync',
+      frequency: const Duration(minutes: 15),
+      constraints: Constraints(
+        networkType: NetworkType.connected,
+        requiresBatteryNotLow: true,
+      ),
+      backoffPolicy: BackoffPolicy.exponential,
+      backoffPolicyDelay: const Duration(minutes: 5),
+    );
     final p = await strava.repository.preferences('strava');
     await Workmanager().cancelByUniqueName('bike-strava-periodic');
     await Workmanager().cancelByUniqueName('bike-strava-pending');
@@ -137,14 +157,21 @@ class IntegrationCoordinator with WidgetsBindingObserver {
     );
   }
 
+  Future<void> _flushOutbox() async {
+    if (strava.service is BackendStravaService) {
+      await (strava.service as BackendStravaService).flushOutbox();
+    }
+  }
+
   Future<void> rideSaved(String id) async {
     final p = await strava.repository.preferences('strava');
-    if (!SyncEngine.permitted(p, 'ride') ||
-        !p.uploads ||
-        !await strava.connected()) {
-      return;
+    if (!SyncEngine.permitted(p, 'ride') || !p.uploads) return;
+    if (strava.service is BackendStravaService) {
+      await (strava.service as BackendStravaService).queueAfterRide(id);
+      unawaited(_flushOutbox());
+    } else if (await strava.connected()) {
+      await strava.service.enqueue(id);
     }
-    await strava.service.enqueue(id);
     await schedule();
     unawaited(engine.run(trigger: 'ride'));
   }
@@ -154,6 +181,7 @@ class IntegrationCoordinator with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       unawaited(syncAccount?.call() ?? Future.value());
       strava.cache.expire();
+      unawaited(_flushOutbox());
       engine.run(trigger: 'open');
     }
   }

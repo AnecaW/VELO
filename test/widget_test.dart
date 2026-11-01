@@ -11,12 +11,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:bike_computer/app/app.dart';
 
 void main() {
-  testWidgets('App loads home screen', (WidgetTester tester) async {
+  testWidgets('App opens the bike computer with all five main sections', (
+    WidgetTester tester,
+  ) async {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const BikeComputerApp());
 
     // Verify that the app loads without errors.
     expect(find.byType(Scaffold), findsWidgets);
-    expect(find.text('Home'), findsOneWidget);
+    expect(find.text('Fiets'), findsOneWidget);
+    expect(find.text('Activiteiten'), findsOneWidget);
+    expect(find.text('Apps'), findsOneWidget);
   });
 }

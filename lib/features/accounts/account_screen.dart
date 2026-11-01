@@ -111,7 +111,11 @@ class _AccountScreenState extends State<AccountScreen> {
       false;
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('VELO-account')),
+    appBar: AppBar(
+      title: Text(
+        widget.onContinueOffline != null ? 'Welkom bij VELO' : 'VELO-account',
+      ),
+    ),
     body: ListView(
       padding: const EdgeInsets.all(20),
       children: [
@@ -120,6 +124,13 @@ class _AccountScreenState extends State<AccountScreen> {
         const Text(
           'Bewaar je ritten bij je account en verbind je favoriete apps. Je fietscomputer blijft ook zonder verbinding werken.',
         ),
+        if (widget.onContinueOffline != null)
+          const Padding(
+            padding: EdgeInsets.only(top: 12),
+            child: Text(
+              'Start je rit met START. Je ritten blijven eerst op dit toestel bewaard en synchroniseren wanneer er verbinding is. Strava vind je later bij Apps.',
+            ),
+          ),
         if (account.localNetworkOnly)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),
@@ -275,11 +286,12 @@ class _AccountScreenState extends State<AccountScreen> {
             onPressed: uiBusy ? null : () => run(account.restore),
             child: const Text('Verbinding opnieuw proberen'),
           ),
-          TextField(
-            controller: password,
-            obscureText: true,
-            decoration: const InputDecoration(labelText: 'Huidig wachtwoord'),
-          ),
+          if (!account.passwordRecovery)
+            TextField(
+              controller: password,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Huidig wachtwoord'),
+            ),
           TextField(
             controller: nextPassword,
             obscureText: true,
@@ -305,7 +317,11 @@ class _AccountScreenState extends State<AccountScreen> {
                     nextPassword.clear();
                     message = 'Wachtwoord gewijzigd. Meld opnieuw aan.';
                   }),
-            child: const Text('Wachtwoord wijzigen en sessies intrekken'),
+            child: Text(
+              account.passwordRecovery
+                  ? 'Nieuw wachtwoord opslaan'
+                  : 'Wachtwoord wijzigen en sessies intrekken',
+            ),
           ),
           OutlinedButton(
             onPressed: uiBusy

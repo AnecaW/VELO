@@ -237,10 +237,10 @@ class _RideSummaryScreenState extends State<RideSummaryScreen> {
           child: ElevatedButton.icon(
             onPressed: () {
               // Return to home
-              context.go('/home');
+              context.go('/ride');
             },
             icon: const Icon(Icons.home),
-            label: const Text('Done'),
+            label: const Text('Naar fietscomputer'),
           ),
         ),
       ],

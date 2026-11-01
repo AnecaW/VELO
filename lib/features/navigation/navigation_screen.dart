@@ -23,7 +23,10 @@ class NavigationScreen extends StatefulWidget {
   State<NavigationScreen> createState() => _NavigationScreenState();
 }
 
-class _NavigationScreenState extends State<NavigationScreen> {
+class _NavigationScreenState extends State<NavigationScreen>
+    with WidgetsBindingObserver {
+  bool _mapVisible = false, _foreground = true;
+  Future<void> _locationTask = Future.value();
   NavRoute? route;
   LatLng? position;
   RouteProgress? progress;
@@ -43,11 +46,40 @@ class _NavigationScreenState extends State<NavigationScreen> {
     super.initState();
     Runtime.settings.addListener(_settingsChanged);
     _load();
-    _watchLocation();
+    WidgetsBinding.instance.addObserver(this);
     cacheTimer = Timer.periodic(
       const Duration(minutes: 1),
       (_) => _checkCache(),
     );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final visible = TickerMode.valuesOf(context).enabled;
+    if (visible != _mapVisible) {
+      _mapVisible = visible;
+      _updateLocation();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
+    _updateLocation();
+  }
+
+  void _updateLocation() {
+    _locationTask = _locationTask
+        .then((_) async {
+          if (!mounted) return;
+          if ((_mapVisible && _foreground) || navigating) {
+            await _watchLocation();
+          } else {
+            await gps.stopListening();
+          }
+        })
+        .catchError((Object _) {});
   }
 
   void _settingsChanged() {
@@ -142,7 +174,11 @@ class _NavigationScreenState extends State<NavigationScreen> {
                 leading: const Icon(Icons.star),
                 title: Text(e.key),
                 onTap: () {
-                  dest.text = e.value;
+                  try {
+                    dest.text = jsonDecode(e.value)['value'] as String;
+                  } catch (_) {
+                    dest.text = e.value;
+                  }
                   Navigator.pop(ctx);
                 },
               ),
@@ -563,6 +599,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     cacheTimer?.cancel();
     Runtime.settings.removeListener(_settingsChanged);
     subscription?.cancel();

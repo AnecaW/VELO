@@ -21,6 +21,8 @@ class _MoreScreenState extends State<MoreScreen> {
   @override
   Widget build(BuildContext context) {
     final entries = <(String, IconData, Widget?)>[
+      ('Dashboard', Icons.space_dashboard_outlined, null),
+      ('Fietscomputer', Icons.speed_rounded, null),
       ('VELO-account', Icons.person_outline, const AccountScreen()),
       ('Ritten', Icons.history, const HistoryScreen()),
       ('Statistieken', Icons.insights, const StatisticsScreen()),
@@ -38,51 +40,114 @@ class _MoreScreenState extends State<MoreScreen> {
         Icons.event_available,
         const TrainingScreen(history: true),
       ),
-      ('Strava', Icons.sync, const IntegrationsScreen()),
       ('Verbonden apps', Icons.hub_outlined, const IntegrationsScreen()),
       ('Activiteitprofielen', Icons.directions_bike, const ProfilesScreen()),
-      ('Apps', Icons.apps, const AppsScreen()),
+      ('Telefoon-apps', Icons.apps, const AppsScreen()),
       ('Instellingen', Icons.settings_outlined, const SettingsScreen()),
       ('Diagnostiek', Icons.monitor_heart_outlined, const DiagnosticsScreen()),
       ('Klimprofiel', Icons.terrain, const ClimbScreen()),
     ];
+    final filtered = entries
+        .where((e) => e.$1.toLowerCase().contains(search.toLowerCase()))
+        .toList();
     return Scaffold(
-      appBar: AppBar(title: const Text('Meer')),
-      body: ListView(
+      appBar: AppBar(title: const Text('Apps')),
+      body: CustomScrollView(
         key: const ValueKey('more-list'),
-        padding: const EdgeInsets.all(20),
-        children: [
-          TextField(
-            decoration: const InputDecoration(
-              hintText: 'Zoek een onderdeel',
-              prefixIcon: Icon(Icons.search),
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+            sliver: SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Alles voor je rit.',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Je fietscomputer, kaarten en persoonlijke hulpmiddelen.',
+                  ),
+                  const SizedBox(height: 20),
+                  TextField(
+                    decoration: const InputDecoration(
+                      hintText: 'Zoek een onderdeel',
+                      prefixIcon: Icon(Icons.search),
+                    ),
+                    onChanged: (v) => setState(() => search = v),
+                  ),
+                ],
+              ),
             ),
-            onChanged: (v) => setState(() => search = v),
           ),
-          const SizedBox(height: 16),
-          for (final e in entries.where(
-            (e) => e.$1.toLowerCase().contains(search.toLowerCase()),
-          ))
-            Card(
-              child: ListTile(
-                leading: Icon(
-                  e.$2,
-                  color: Theme.of(context).colorScheme.primary,
+          if (filtered.isEmpty)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text('Geen onderdelen gevonden.'),
+              ),
+            ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            sliver: SliverLayoutBuilder(
+              builder: (context, constraints) => SliverGrid.builder(
+                itemCount: filtered.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: constraints.crossAxisExtent >= 600 ? 3 : 2,
+                  mainAxisExtent: 126,
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
                 ),
-                title: Text(e.$1),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  if (e.$3 == null) {
-                    context.go('/navigation');
-                  } else {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute<void>(builder: (_) => e.$3!),
-                    );
-                  }
+                itemBuilder: (context, i) {
+                  final e = filtered[i];
+                  return Card(
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(22),
+                      onTap: () {
+                        if (e.$3 == null) {
+                          if (e.$1 == 'Dashboard') {
+                            context.push('/home');
+                          } else {
+                            context.go(
+                              e.$1 == 'Fietscomputer' ? '/ride' : '/navigation',
+                            );
+                          }
+                        } else {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute<void>(builder: (_) => e.$3!),
+                          );
+                        }
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Icon(
+                              e.$2,
+                              size: 30,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            Text(
+                              e.$1,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
                 },
               ),
             ),
+          ),
         ],
       ),
     );

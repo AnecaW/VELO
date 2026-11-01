@@ -1,5 +1,6 @@
 import 'package:bike_computer/services/integrations/strava_integration.dart';
 import 'package:bike_computer/services/accounts/account_service.dart';
+import 'package:bike_computer/services/accounts/supabase_account_service.dart';
 import 'package:bike_computer/services/accounts/account_sync.dart';
 import 'package:bike_computer/models/ride_session.dart';
 import 'package:bike_computer/services/ride/session_codec.dart';
@@ -13,7 +14,9 @@ import 'package:bike_computer/core/settings.dart';
 import 'package:bike_computer/services/bluetooth/ble_sensor_manager.dart';
 
 class Runtime {
-  static final AccountService accounts = AccountService(
+  static final AccountService accounts = SupabaseAccountService(
+    onLegacyIdentity: (previous, owner) =>
+        accountSync.importLegacyArchive(previous, owner),
     refreshMutex: (action) => database.withAccountRefreshLock(action),
     onIdentityChange: (next) async {
       // Expiry must not change the owner of a recording still in progress.

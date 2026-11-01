@@ -1,0 +1,8 @@
+project_id = "velo"
+
+[functions.velo-api]
+# The handler verifies Supabase users itself; the only public path is OAuth callback.
+verify_jwt = false
+
+[functions.velo-worker]
+verify_jwt = false

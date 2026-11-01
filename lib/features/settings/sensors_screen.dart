@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:bike_computer/core/runtime.dart';
@@ -41,7 +42,7 @@ class _SensorsScreenState extends State<SensorsScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Sensor Manager')),
+    appBar: AppBar(title: const Text('Sensoren')),
     body: ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -86,12 +87,12 @@ class _SensorsScreenState extends State<SensorsScreen> {
                           await Runtime.database.putDocument(
                             'sensors',
                             s.id,
-                            s.name,
+                            jsonEncode({'name': s.name, 'type': s.type.name}),
                           );
                         }
                       }),
                 child: Text(
-                  manager.isConnected(s.id) ? 'Disconnect' : 'Connect',
+                  manager.isConnected(s.id) ? 'Ontkoppelen' : 'Verbinden',
                 ),
               ),
             ),

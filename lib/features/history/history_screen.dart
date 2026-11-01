@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bike_computer/features/ride/ride_summary_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:bike_computer/services/ride/ride_history_service.dart';
@@ -14,16 +16,26 @@ class HistoryScreen extends StatefulWidget {
 class _HistoryScreenState extends State<HistoryScreen> {
   late final RideHistoryService _historyService;
   bool _isLoading = true;
+  String? _error;
+  StreamSubscription<String>? _changes;
 
   @override
   void initState() {
     super.initState();
     _historyService = widget.service ?? RideHistoryService();
     _loadHistory();
+    _changes = _historyService.database.documentChanges
+        .where((kind) => kind == 'ride')
+        .listen((_) => _loadHistory());
   }
 
   Future<void> _loadHistory() async {
-    await _historyService.loadPersistedRides();
+    try {
+      await _historyService.loadPersistedRides();
+      _error = null;
+    } catch (_) {
+      _error = 'Ritten laden is niet gelukt. Probeer opnieuw.';
+    }
     if (mounted) {
       setState(() {
         _isLoading = false;
@@ -37,17 +49,34 @@ class _HistoryScreenState extends State<HistoryScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    if (_error != null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Activiteiten')),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(_error!),
+              TextButton(
+                onPressed: _loadHistory,
+                child: const Text('Opnieuw proberen'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     final rides = _historyService.getRidesSortedByDate();
     final stats = _historyService.getStatistics();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('RIDE HISTORY'),
+        title: const Text('Activiteiten'),
         actions: [
           if (rides.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_outline),
-              tooltip: 'Clear history',
+              tooltip: 'Ritgeschiedenis wissen',
               onPressed: _confirmClearHistory,
             ),
         ],
@@ -66,7 +95,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
                     // Rides list
                     Text(
-                      'RECENT RIDES',
+                      'Recente ritten',
                       style: Theme.of(context).textTheme.labelMedium,
                     ),
                     const SizedBox(height: 12),
@@ -98,16 +127,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final shouldClear = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Clear history?'),
-        content: const Text('This will remove all saved rides from the app.'),
+        title: const Text('Alle ritten verwijderen?'),
+        content: const Text(
+          'Alle opgeslagen ritten worden verwijderd. Dit wordt ook naar je account gesynchroniseerd.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: const Text('Annuleren'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Clear'),
+            child: const Text('Verwijderen'),
           ),
         ],
       ),
@@ -135,12 +166,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'No rides yet',
+            'Nog geen ritten',
             style: Theme.of(context).textTheme.headlineSmall,
           ),
           const SizedBox(height: 8),
           Text(
-            'Start recording a ride to see it here',
+            'Je opgeslagen ritten verschijnen hier.',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
         ],
@@ -175,7 +206,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
                 const SizedBox(height: 4),
-                Text('Distance', style: Theme.of(context).textTheme.labelSmall),
+                Text('Afstand', style: Theme.of(context).textTheme.labelSmall),
               ],
             ),
             Column(
@@ -185,7 +216,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
                 const SizedBox(height: 4),
-                Text('Time', style: Theme.of(context).textTheme.labelSmall),
+                Text('Tijd', style: Theme.of(context).textTheme.labelSmall),
               ],
             ),
           ],
@@ -264,7 +295,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       Text(
-                        'Distance',
+                        'Afstand',
                         style: Theme.of(context).textTheme.labelSmall,
                       ),
                     ],
@@ -279,7 +310,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       Text(
-                        'Time',
+                        'Tijd',
                         style: Theme.of(context).textTheme.labelSmall,
                       ),
                     ],
@@ -294,7 +325,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       Text(
-                        'Avg',
+                        'Gemiddelde',
                         style: Theme.of(context).textTheme.labelSmall,
                       ),
                     ],
@@ -306,6 +337,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _changes?.cancel();
+    super.dispose();
   }
 
   String _formatDate(DateTime? date) {

@@ -43,6 +43,7 @@ class AccountService extends ChangeNotifier {
   final String base;
   static const _lanBuild = bool.fromEnvironment('VELO_LAN_MODE');
   bool get localNetworkOnly => _lanBuild;
+  bool get passwordRecovery => false;
   static bool _privateAddress(String host) {
     final address = InternetAddress.tryParse(host);
     if (address == null || address.rawAddress.length != 4) return false;
@@ -389,7 +390,9 @@ class AccountService extends ChangeNotifier {
         'velo-pending-logout',
         remaining.isEmpty ? null : jsonEncode(remaining),
       );
-      if (remaining.isEmpty && state == AccountState.signedOut && user == null) {
+      if (remaining.isEmpty &&
+          state == AccountState.signedOut &&
+          user == null) {
         _state(AccountState.signedOut);
       }
     }

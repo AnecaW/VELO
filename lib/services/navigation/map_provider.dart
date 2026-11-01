@@ -40,7 +40,7 @@ class MapStyleSpec {
 Future<void>? _configured;
 Future<void> configureMapNetworking() => _configured ??= Future<void>(() async {
   await ml.setHttpHeaders({
-    'User-Agent': 'UltimateBikeComputer/2.0 (com.example.bike_computer; personal cycling)',
+    'User-Agent': 'VELO/2.3 (com.example.bike_computer; personal cycling)',
   });
   await ml.setOfflineMaxConcurrentRequests(
     maxRequests: 4,

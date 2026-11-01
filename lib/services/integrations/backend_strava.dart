@@ -12,6 +12,48 @@ import 'integration_models.dart';
 class BackendStravaService extends StravaService {
   final AccountService accounts;
   BackendStravaService(super.database, this.accounts);
+  bool _flushing = false;
+  Future<void> queueAfterRide(String id) async {
+    final owner = accounts.user?['id'];
+    if (owner == null) return;
+    await database.putDocument(
+      'strava-upload-outbox',
+      jsonEncode([owner, id]),
+      jsonEncode({'owner': owner, 'ride': id}),
+    );
+  }
+
+  /// A local save never waits for Strava. Only acknowledged, idempotent jobs
+  /// leave this owner-bound outbox; network failures remain queued.
+  Future<void> flushOutbox() async {
+    if (_flushing || accounts.user == null) return;
+    _flushing = true;
+    try {
+      final owner = accounts.user!['id'];
+      final pending = (await database.documents('strava-upload-outbox')).entries
+          .where((e) => jsonDecode(e.value)['owner'] == owner)
+          .toList();
+      if (pending.isEmpty) return;
+      final preferences = await SyncRepository(database).preferences('strava');
+      if (!preferences.enabled ||
+          !preferences.uploads ||
+          (await account()) == null) {
+        return;
+      }
+      for (final row in pending) {
+        if (accounts.user?['id'] != owner) return;
+        final id = jsonDecode(row.value)['ride'] as String;
+        if (await database.getDocument('ride', id) == null) continue;
+        await enqueue(id);
+        await database.removeDocument('strava-upload-outbox', row.key);
+      }
+    } catch (_) {
+      // Retry on network/lifecycle/background events without exposing tokens.
+    } finally {
+      _flushing = false;
+    }
+  }
+
   Future<Map<String, dynamic>> information() async {
     if (accounts.user == null) return {'configured': false, 'connected': false};
     return Map<String, dynamic>.from(
@@ -198,13 +240,20 @@ class BackendStravaService extends StravaService {
   Future<void> disconnect() async {
     await accounts.request('DELETE', '/api/v1/integrations/strava');
     await StravaCache(database).expire(all: true);
+    for (final row in (await database.documents(
+      'strava-upload-outbox',
+    )).entries) {
+      if (jsonDecode(row.value)['owner'] == accounts.user?['id']) {
+        await database.removeDocument('strava-upload-outbox', row.key);
+      }
+    }
   }
 
   @override
   Future<void> enqueue(String id) async {
     if (id.startsWith('strava:') ||
         await database.getDocument('activity-source', id) != null) {
-      throw AccountFailure('Alleen eigen ritten kunnen worden geÃ¼pload.');
+      throw AccountFailure('Alleen eigen ritten kunnen worden geüpload.');
     }
     final raw = await database.getDocument('ride', id);
     if (raw == null) throw AccountFailure('GPS-spoor ontbreekt.');

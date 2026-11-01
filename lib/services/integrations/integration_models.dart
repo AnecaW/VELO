@@ -141,7 +141,7 @@ class IntegrationRegistry {
     IntegrationInfo(
       'komoot',
       'Komoot',
-      'Routes via officiÃ«le GPX-export en bestaande GPX-import.',
+      'Routes via officiële GPX-export en bestaande GPX-import.',
       'Niet rechtstreeks beschikbaar: geen publieke API.',
       'https://support.komoot.com/hc/en-us/articles/10331570510618-komoot-API',
     ),
@@ -162,14 +162,14 @@ class IntegrationRegistry {
     IntegrationInfo(
       'rwgps',
       'Ride with GPS',
-      'OfficiÃ«le OAuth API voor routes en ritten.',
+      'Officiële OAuth API voor routes en ritten.',
       'Eigen API-client vereist; adapter nog niet geïmplementeerd.',
       'https://ridewithgps.com/api',
     ),
     IntegrationInfo(
       'trainingpeaks',
       'TrainingPeaks',
-      'OfficiÃ«le partners-API voor trainingsgegevens.',
+      'Officiële partners-API voor trainingsgegevens.',
       'Alleen goedgekeurde ontwikkelaars; geen persoonlijke API-toegang.',
       'https://help.trainingpeaks.com/hc/en-us/articles/234441128-TrainingPeaks-API',
     ),

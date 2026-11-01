@@ -129,6 +129,37 @@ class Device {
 }
 
 void main() {
+  test('legacy archive upgrade preserves data, other accounts and subsequent edits', () async {
+    final db = BikeComputerDatabase(executor: NativeDatabase.memory());
+    final account = AccountService(store: Tokens());
+    final sync = AccountSync(db, account);
+    await db.putDocument('account-owner', 'current', 'cloud-user');
+    await db.putDocument(
+      'account-archive',
+      'legacy-user',
+      jsonEncode({
+        'routes': {'home': '{"name":"Home"}'},
+      }),
+    );
+    await db.putDocument(
+      'account-archive',
+      'other-user',
+      jsonEncode({
+        'routes': {'private': '{"name":"Private"}'},
+      }),
+    );
+    await sync.importLegacyArchive('legacy-user', 'cloud-user');
+    expect(await db.getDocument('routes', 'home'), '{"name":"Home"}');
+    expect(await db.getDocument('routes', 'private'), isNull);
+    await db.putDocument('routes', 'home', '{"name":"Edited"}');
+    await sync.importLegacyArchive('legacy-user', 'cloud-user');
+    expect(await db.getDocument('routes', 'home'), '{"name":"Edited"}');
+    expect(await db.getDocument('account-archive', 'legacy-user'), isNotNull);
+    sync.dispose();
+    account.dispose();
+    await db.close();
+  });
+
   test('a stale background sync cannot restore the previous account after a foreground switch', () async {
     final server = SyncServer();
     final foreground = Device(server);

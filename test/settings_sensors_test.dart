@@ -15,7 +15,7 @@ void main() {
       await tester.tap(find.text('Scan sensoren'));
       await tester.pumpAndSettle();
       expect(find.text('Polar H10'), findsOneWidget);
-      expect(find.text('Connect'), findsWidgets);
+      expect(find.text('Verbinden'), findsWidgets);
       await tester.pumpWidget(const SizedBox());
       manager.dispose();
     },

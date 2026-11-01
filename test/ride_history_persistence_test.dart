@@ -122,12 +122,12 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: HistoryScreen(service: h)));
     await tester.pumpAndSettle();
     expect(find.text('Ride #1'), findsOneWidget);
-    await tester.tap(find.byTooltip('Clear history'));
+    await tester.tap(find.byTooltip('Ritgeschiedenis wissen'));
     await tester.pumpAndSettle();
-    expect(find.text('Clear history?'), findsOneWidget);
-    await tester.tap(find.text('Clear'));
+    expect(find.text('Alle ritten verwijderen?'), findsOneWidget);
+    await tester.tap(find.text('Verwijderen'));
     await tester.pumpAndSettle();
-    expect(find.text('No rides yet'), findsOneWidget);
+    expect(find.text('Nog geen ritten'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
     await db.close();
   });

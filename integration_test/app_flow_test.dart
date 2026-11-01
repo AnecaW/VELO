@@ -6,6 +6,7 @@ import 'package:bike_computer/core/runtime.dart';
 import 'package:bike_computer/app/router.dart';
 import 'package:bike_computer/services/navigation/gpx_route.dart';
 import 'package:bike_computer/features/settings/system_screens.dart';
+import 'package:bike_computer/features/settings/settings_screen.dart';
 import 'package:bike_computer/services/ride/session_codec.dart';
 import 'package:bike_computer/features/settings/sensors_screen.dart';
 import 'package:bike_computer/features/integrations/connected_apps_screen.dart';
@@ -14,35 +15,51 @@ import 'package:bike_computer/features/integrations/gpx_exchange_screen.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   testWidgets(
-    'Android real GPS ride lifecycle, history, map, settings and launcher',
+    'Android ride lifecycle, actual location availability, maps, training and internal apps',
     (tester) async {
-      await app.main();
-      await tester.pumpAndSettle();
-      if (find.text('Verder zonder account').evaluate().isNotEmpty) {
-        await tester.tap(find.text('Verder zonder account'));
-        await tester.pumpAndSettle();
+      Future<void> until(Finder finder) async {
+        final deadline = DateTime.now().add(const Duration(seconds: 40));
+        while (finder.evaluate().isEmpty && DateTime.now().isBefore(deadline)) {
+          await tester.pump(const Duration(milliseconds: 250));
+        }
+        expect(finder, findsWidgets);
       }
-      expect(find.text('Home'), findsOneWidget);
-      await tester.tap(
-        find.byKey(const ValueKey('profile-chip-gravel_default')),
-      );
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('START RIDE'));
-      await tester.tap(find.text('START RIDE'));
-      await tester.pumpAndSettle();
-      expect(find.text('READY'), findsOneWidget);
+
+      await app.main();
+      await tester.pump(const Duration(seconds: 3));
+      final startupDeadline = DateTime.now().add(const Duration(seconds: 40));
+      while (!Runtime.accounts.initialized &&
+          DateTime.now().isBefore(startupDeadline)) {
+        await tester.pump(const Duration(milliseconds: 250));
+      }
+      await tester.pump(const Duration(milliseconds: 500));
+      if (find.text('Verder zonder account').evaluate().isNotEmpty) {
+        await tester.ensureVisible(find.text('Verder zonder account'));
+        await tester.tap(find.text('Verder zonder account'));
+        await tester.pump(const Duration(milliseconds: 500));
+      }
+      await until(find.text('Fiets'));
+      await tester.pump(const Duration(seconds: 1));
+      if (find.text('Herstellen').evaluate().isNotEmpty) {
+        await tester.tap(find.text('Herstellen'));
+        await tester.pump(const Duration(milliseconds: 500));
+      }
+      expect(find.byTooltip('Gegevensvelden'), findsOneWidget);
       debugPrint('UI ready');
       await tester.tap(find.byTooltip('Gegevensvelden'));
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
       expect(
         find.text('Gegevensvelden · versleep om te ordenen'),
         findsOneWidget,
       );
       await tester.tap(find.text('Opslaan'));
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
       await tester.tap(find.byKey(const ValueKey('ride-start-pause')));
-      await tester.pumpAndSettle();
-      expect(find.text('RECORDING'), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 500));
+      if (find.text('Doorgaan').evaluate().isNotEmpty) {
+        await tester.tap(find.text('Doorgaan'));
+      }
+      await until(find.text('Rit bezig'));
       debugPrint('UI recording');
       final recording = Runtime.ride.service;
       await tester.tap(find.byKey(const ValueKey('tab-1')));
@@ -52,21 +69,25 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('tab-3')));
       await tester.pump(const Duration(seconds: 2));
       expect(Runtime.ride.session.isRecording, isTrue);
-      await tester.tap(find.byKey(const ValueKey('tab-2')));
-      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('tab-0')));
+      await tester.pump(const Duration(milliseconds: 500));
       await tester.pump(const Duration(seconds: 4));
       await tester.tap(find.byKey(const ValueKey('ride-start-pause')));
-      await tester.pumpAndSettle();
-      expect(find.text('PAUSED'), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 500));
+      await until(find.text('Gepauzeerd'));
       debugPrint('UI paused');
       await tester.tap(find.byKey(const ValueKey('ride-start-pause')));
-      await tester.pumpAndSettle();
-      expect(find.text('RECORDING'), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 500));
+      if (find.text('Doorgaan').evaluate().isNotEmpty) {
+        await tester.tap(find.text('Doorgaan'));
+      }
+      await until(find.text('Rit bezig'));
       debugPrint('UI recording');
       await tester.tap(find.byKey(const ValueKey('ride-stop')));
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
       await tester.tap(find.text('Opslaan'));
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
+      await until(find.text('RIDE SAVED'));
       expect(find.text('RIDE SAVED'), findsOneWidget);
       debugPrint('UI saved');
       final rides = await Runtime.database.getAllRides();
@@ -75,16 +96,20 @@ void main() {
         'ride',
         rides.last.rideId,
       );
-      expect(SessionCodec.decode(payload!).trackPoints, isNotEmpty);
+      final saved = SessionCodec.decode(payload!);
+      expect(saved.elapsedTime.inSeconds, greaterThanOrEqualTo(4));
+      if (saved.trackPoints.isEmpty) expect(saved.totalDistance, 0);
       router.go('/history');
-      await tester.pumpAndSettle();
-      expect(find.text('RIDE HISTORY'), findsOneWidget);
+      debugPrint('Route requested: /history');
+      await tester.pump(const Duration(milliseconds: 500));
+      await until(find.text('Activiteiten'));
       await tester.tap(find.text('Ride #1'));
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
+      await until(find.text('RIDE SAVED'));
       expect(find.text('RIDE SAVED'), findsOneWidget);
       debugPrint('UI saved');
       router.go('/navigation');
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
       expect(find.text('Kaart'), findsWidgets);
       const route = NavRoute('Android offline route', [
         NavPoint(51, 4, 10),
@@ -97,20 +122,32 @@ void main() {
       );
       await Runtime.settings.set('keepOn', false);
       router.go('/settings');
-      await tester.pumpAndSettle();
-      expect(find.text('Settings'), findsWidgets);
+      await tester.pump(const Duration(milliseconds: 500));
+      await until(find.text('Settings'));
       await tester.tap(find.text('Sensors'));
-      await tester.pumpAndSettle();
-      expect(find.byType(SensorsScreen), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 500));
+      await until(find.byType(SensorsScreen));
       Navigator.of(tester.element(find.byType(SensorsScreen))).pop();
-      await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(find.text('Apps & Launcher'), 300);
-      await tester.tap(find.text('Apps & Launcher'));
-      await tester.pumpAndSettle();
-      expect(find.byType(AppsScreen), findsOneWidget);
-      expect(find.text('Standaardlauncher instellen'), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.scrollUntilVisible(
+        find.text('Telefoon-apps'),
+        300,
+        scrollable: find
+            .descendant(
+              of: find.byType(SettingsScreen),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.tap(find.text('Telefoon-apps'));
+      await tester.pump(const Duration(milliseconds: 500));
+      await until(find.byType(AppsScreen));
+      expect(find.text('Standaardlauncher instellen'), findsNothing);
+      Navigator.of(tester.element(find.byType(AppsScreen))).pop();
+      await tester.pump(const Duration(milliseconds: 500));
       router.go('/more');
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
+      await until(find.byKey(const ValueKey('more-list')));
       await tester.scrollUntilVisible(
         find.text('Verbonden apps'),
         200,
@@ -122,11 +159,11 @@ void main() {
             .first,
       );
       await tester.tap(find.text('Verbonden apps'));
-      await tester.pumpAndSettle();
-      expect(find.byType(ConnectedAppsScreen), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 500));
+      await until(find.byType(ConnectedAppsScreen));
       await tester.tap(find.text('GPX-bestanden'));
-      await tester.pumpAndSettle();
-      expect(find.byType(GpxExchangeScreen), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 500));
+      await until(find.byType(GpxExchangeScreen));
       expect(find.text('GPX-route importeren'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },

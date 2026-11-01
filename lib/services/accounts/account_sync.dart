@@ -25,6 +25,8 @@ class AccountSync extends ChangeNotifier {
     'profiles': 'profiles',
     'training-profile': 'training_profile',
     'training-results': 'training_results',
+    'sensors': 'sensor_configs',
+    'favorites': 'favorites',
   };
   static const _deviceSettings = {
     'offlineMap',
@@ -33,6 +35,18 @@ class AccountSync extends ChangeNotifier {
     'customStyle',
   };
   String _portable(String category, String id, String raw) {
+    if (category == 'favorites') {
+      try {
+        if (jsonDecode(raw) is Map) return raw;
+      } catch (_) {}
+      return jsonEncode({'value': raw});
+    }
+    if (category == 'sensors') {
+      try {
+        if (jsonDecode(raw) is Map) return raw;
+      } catch (_) {}
+      return jsonEncode({'name': raw});
+    }
     if (category != 'settings' || id != 'app') return raw;
     final values = Map<String, dynamic>.from(jsonDecode(raw));
     values.removeWhere(
@@ -258,9 +272,45 @@ class AccountSync extends ChangeNotifier {
     }
   }
 
+  /// Upgrade only the previous, still locally authenticated account. The caller
+  /// checks its securely stored identity against the new authenticated email.
+  /// Other archived accounts are never claimed by a fresh registration.
+  Future<void> importLegacyArchive(String previous, String owner) async {
+    final marker = jsonEncode([previous, owner]);
+    if (await database.getDocument('account-migrations', marker) != null) {
+      return;
+    }
+    final raw = await database.getDocument('account-archive', previous);
+    if (raw == null) return;
+    await database.transaction(() async {
+      if (await database.getDocument('account-owner', 'current') != owner) {
+        return;
+      }
+      final snapshot = jsonDecode(raw) as Map;
+      for (final category in categories.keys) {
+        for (final item in (snapshot[category] as Map? ?? {}).entries) {
+          final existing = await database.getDocument(category, item.key);
+          if (existing != null && existing != item.value) {
+            await _preserve(owner, category, item.key, existing);
+          }
+          await _apply(category, item.key, item.value);
+        }
+      }
+      await database.putDocument('account-migrations', marker, 'complete');
+    });
+    await onSettingsChanged?.call();
+  }
+
   Future<void> forgetUser(String owner) async {
     await switchIdentity(null);
     await database.removeDocument('account-archive', owner);
+    for (final entry in (await database.documents(
+      'strava-upload-outbox',
+    )).entries) {
+      if (jsonDecode(entry.value)['owner'] == owner) {
+        await database.removeDocument('strava-upload-outbox', entry.key);
+      }
+    }
     for (final category in ['account-sync-meta', 'account-sync-cursor']) {
       for (final key in (await database.documents(category)).keys) {
         if ((jsonDecode(key) as List).first == owner) {

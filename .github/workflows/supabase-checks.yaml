@@ -1,0 +1,18 @@
+name: Supabase checks
+on:
+  push:
+    paths: ['supabase/**', 'scripts/supabase_admin.py', 'scripts/test_supabase_live.py', '.github/workflows/supabase-checks.yaml']
+  pull_request:
+    paths: ['supabase/**', 'scripts/supabase_admin.py', 'scripts/test_supabase_live.py', '.github/workflows/supabase-checks.yaml']
+permissions:
+  contents: read
+jobs:
+  edge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno check supabase/functions/velo-api/index.ts supabase/functions/velo-worker/index.ts
+      - run: deno test --allow-env supabase/functions/security_test.ts supabase/functions/strava_test.ts

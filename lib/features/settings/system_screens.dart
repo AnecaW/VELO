@@ -69,21 +69,10 @@ class _AppsScreenState extends State<AppsScreen> {
                 : af - bf;
           });
     return Scaffold(
-      appBar: AppBar(title: const Text('Apps & Launcher')),
+      appBar: AppBar(title: const Text('Telefoon-apps')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          FilledButton.icon(
-            onPressed: () => _call('homeSettings'),
-            icon: const Icon(Icons.home),
-            label: const Text('Standaardlauncher instellen'),
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Text(
-              'Android vraagt je zelf een startscherm te kiezen. Herstel via Instellingen > Apps > Standaardapps > Startscherm.',
-            ),
-          ),
           OutlinedButton(
             onPressed: () => _call('pin'),
             child: const Text('Scherm vastzetten (Android bevestigt)'),

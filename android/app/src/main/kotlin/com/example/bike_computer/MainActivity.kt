@@ -1,7 +1,6 @@
 package com.example.bike_computer
 
 import android.Manifest
-import android.app.role.RoleManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
@@ -38,15 +37,6 @@ class MainActivity : FlutterActivity() {
                         val pkg = call.arguments as String
                         val intent = packageManager.getLaunchIntentForPackage(pkg) ?: throw IllegalArgumentException("App niet beschikbaar")
                         startActivity(intent); result.success(null)
-                    }
-                    "homeSettings" -> {
-                        if (Build.VERSION.SDK_INT >= 29) {
-                            val roles = getSystemService(RoleManager::class.java)
-                            if (roles.isRoleAvailable(RoleManager.ROLE_HOME) && !roles.isRoleHeld(RoleManager.ROLE_HOME))
-                                startActivityForResult(roles.createRequestRoleIntent(RoleManager.ROLE_HOME), 56)
-                            else startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
-                        } else startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
-                        result.success(null)
                     }
                     "pin" -> { startLockTask(); result.success(null) }
                     "unpin" -> { stopLockTask(); result.success(null) }

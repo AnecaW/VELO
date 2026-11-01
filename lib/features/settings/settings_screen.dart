@@ -415,11 +415,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ),
         ),
-        _section(
-          'Apps & Launcher',
-          Icons.apps,
-          () => _page(const AppsScreen()),
-        ),
+        _section('Telefoon-apps', Icons.apps, () => _page(const AppsScreen())),
         _section(
           'Back-up & herstellen',
           Icons.backup,

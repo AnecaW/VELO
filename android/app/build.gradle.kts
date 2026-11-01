@@ -1,5 +1,4 @@
 import java.util.Properties
-import java.util.Base64
 
 plugins {
     id("com.android.application")
@@ -10,13 +9,6 @@ plugins {
 val releaseProperties = Properties()
 val releasePropertiesFile = rootProject.file("key.properties")
 if (releasePropertiesFile.exists()) releasePropertiesFile.inputStream().use { releaseProperties.load(it) }
-val veloBuildDefines = (project.findProperty("dart-defines") as? String).orEmpty()
-    .split(',')
-    .mapNotNull { encoded ->
-        runCatching { String(Base64.getDecoder().decode(encoded), Charsets.UTF_8).split('=', limit = 2) }
-            .getOrNull()?.takeIf { it.size == 2 }
-    }
-    .associate { it[0] to it[1] }
 
 android {
     namespace = "com.example.bike_computer"
@@ -41,7 +33,7 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        manifestPlaceholders["veloCleartextTraffic"] = if (veloBuildDefines["VELO_LAN_MODE"] == "true") "true" else "false"
+        manifestPlaceholders["veloCleartextTraffic"] = "false"
     }
 
     signingConfigs {

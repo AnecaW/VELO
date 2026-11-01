@@ -1,3 +1,5 @@
+> Historisch: dit beschrijft de vorige self-hosted installatie. De actieve app gebruikt nu [Supabase](SUPABASE.md); deze oude instructies zijn niet nodig voor gebruik.
+
 # VELO self-hosted installatie
 
 De Flutter-app blijft in de bestaande projectroot. `backend/` bevat FastAPI, een onderhouden SQLite-datalaag met versiegestuurde SQL-migraties, een worker en versleutelde back-ups. Een enkele API-process en worker delen een SQLite WAL-volume op lokale Docker-opslag. Gebruik geen NFS/SMB-volume en schaal deze containers niet horizontaal. Voor meerdere servers is een PostgreSQL-migratie nodig.

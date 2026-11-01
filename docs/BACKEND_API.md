@@ -1,3 +1,5 @@
+> Historisch: dit beschrijft de vorige self-hosted installatie. De actieve app gebruikt nu [Supabase](SUPABASE.md); deze oude instructies zijn niet nodig voor gebruik.
+
 # Backend API
 
 Gebruik `Authorization: Bearer <access_token>` voor alle eigen gegevens. Access-tokens leven 15 minuten. Refresh-tokens worden bij iedere vernieuwing vervangen en alleen als digest bewaard. Hergebruik trekt de familie in; wachtwoordwijziging en herstel trekken alle sessies in. Wachtwoorden gebruiken Argon2id, bestaande scrypt-hashes blijven leesbaar.

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 
 import 'package:go_router/go_router.dart';
-import 'package:bike_computer/core/runtime.dart';
 import 'package:bike_computer/features/home/home_screen.dart';
 import 'package:bike_computer/features/navigation/navigation_screen.dart';
 import 'package:bike_computer/features/ride/ride_screen.dart';
@@ -57,7 +56,7 @@ class ScaffoldWithNavBar extends StatelessWidget {
                                   vertical: 6,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: i == 2
+                                  color: i == 0
                                       ? Theme.of(context).colorScheme.primary
                                       : navigationShell.currentIndex == i
                                       ? Theme.of(context).colorScheme.primary
@@ -67,14 +66,14 @@ class ScaffoldWithNavBar extends StatelessWidget {
                                 ),
                                 child: Icon(
                                   [
-                                    Icons.home_outlined,
-                                    Icons.map_outlined,
                                     Icons.speed,
+                                    Icons.map_outlined,
+                                    Icons.history_rounded,
                                     Icons.fitness_center,
                                     Icons.grid_view_rounded,
                                   ][i],
-                                  size: i == 2 ? 26 : 23,
-                                  color: i == 2
+                                  size: i == 0 ? 26 : 23,
+                                  color: i == 0
                                       ? Colors.black
                                       : navigationShell.currentIndex == i
                                       ? Theme.of(context).colorScheme.primary
@@ -85,11 +84,11 @@ class ScaffoldWithNavBar extends StatelessWidget {
                               const SizedBox(height: 3),
                               Text(
                                 [
-                                  'Home',
-                                  'Kaart',
                                   'Fiets',
+                                  'Kaart',
+                                  'Activiteiten',
                                   'Training',
-                                  'Meer',
+                                  'Apps',
                                 ][i],
                                 maxLines: 1,
                                 style: TextStyle(
@@ -115,9 +114,7 @@ class ScaffoldWithNavBar extends StatelessWidget {
 }
 
 final router = GoRouter(
-  initialLocation: Runtime.settings.value('startRide', false)
-      ? '/ride'
-      : '/home',
+  initialLocation: '/ride',
   routes: [
     StatefulShellRoute.indexedStack(
       builder: (context, state, shell) =>
@@ -125,7 +122,7 @@ final router = GoRouter(
       branches: [
         StatefulShellBranch(
           routes: [
-            GoRoute(path: '/home', builder: (_, s) => const HomeScreen()),
+            GoRoute(path: '/ride', builder: (_, s) => const RideScreen()),
           ],
         ),
         StatefulShellBranch(
@@ -138,7 +135,7 @@ final router = GoRouter(
         ),
         StatefulShellBranch(
           routes: [
-            GoRoute(path: '/ride', builder: (_, s) => const RideScreen()),
+            GoRoute(path: '/history', builder: (_, s) => const HistoryScreen()),
           ],
         ),
         StatefulShellBranch(
@@ -157,7 +154,7 @@ final router = GoRouter(
       ],
     ),
     GoRoute(path: '/settings', builder: (_, s) => const SettingsScreen()),
-    GoRoute(path: '/history', builder: (_, s) => const HistoryScreen()),
+    GoRoute(path: '/home', builder: (_, s) => const HomeScreen()),
     GoRoute(
       path: '/ride/summary',
       builder: (_, s) => s.extra is RideSession

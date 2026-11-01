@@ -1,3 +1,5 @@
+> Historisch: dit beschrijft de vorige self-hosted installatie. De actieve app gebruikt nu [Supabase](SUPABASE.md); deze oude instructies zijn niet nodig voor gebruik.
+
 # VELO: intern beheerde verbinding en automatische updates
 
 Dit document is voor de eigenaar/ontwikkelaar, niet voor gewone gebruikers. De normale Android-interface bevat geen backend-URL, Client ID, client secret, API-key of installatie-instructies.
