@@ -46,3 +46,9 @@ Gecontroleerde officiële bronnen op 1 november 2026:
 - [Health Connect](https://developer.android.com/health-and-fitness/health-connect/get-started): Android SDK en afzonderlijke systeemtoestemming.
 
 Alleen Strava heeft een serveradapter. De overige diensten worden informatief getoond; er worden geen verbindingen gesimuleerd. Lokale fietscomputerfuncties blijven zonder account en bij serveruitval toegankelijk.
+
+## Automatische accountgegevens en navigatie
+
+Documenten ondersteunen ook `training_plans`, `profiles`, `training_profile` en `training_results`. Incrementele downloads gebruiken `include_deleted=true` voor tombstones; mutaties vereisen de bekende revisie zodat een andere client geen nieuwe versie stil overschrijft. Documentnamen mogen leestekens en slashes bevatten. De app bewaart conflicterende versies lokaal. Providercache en toestelgebonden kaartpaden worden niet als persoonlijke accountdocumenten gesynchroniseerd.
+
+De geauthenticeerde navigatieproxy bewaart `ORS_API_KEY` uitsluitend op de server. Zonder sleutel meldt hij de dienst als niet geconfigureerd. Retry van onzekere uploads vereist expliciete bevestiging; een job kan alleen door de eigenaar opnieuw worden aangeboden.

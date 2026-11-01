@@ -4,7 +4,7 @@ VELO is een Android-fietscomputer met ritregistratie, navigatie, offline kaarten
 
 ## Gebruiken
 
-1. Installeer de aangeleverde VELO-app.
+1. Download en installeer [VELO voor het thuisnetwerk](https://github.com/AnecaW/VELO/releases/tag/android-lan-v2.2.0) (`velo-lan.apk`).
 2. Open VELO en maak een account aan of meld je aan.
 3. Begin met fietsen. Je eigen ritten, routes, profielen, trainingsgegevens en instellingen worden automatisch bij je account bewaard.
 4. Open optioneel **Verbonden apps** om Strava te koppelen wanneer deze dienst beschikbaar is.
